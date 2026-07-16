@@ -1,18 +1,13 @@
+"""EDA Augmentation - Easy Data Augmentation"""
 from __future__ import annotations
+from .synonyms import build_synonym_dict
 
 import random
+from typing import Any
 
-from .base_augmenter import AugmentedSample, BaseAugmenter
+from underthesea import word_tokenize
 
-
-VIETNAMESE_FILLERS = [
-    "thật sự",
-    "rất",
-    "khá",
-    "này",
-    "đó",
-    "luôn",
-]
+from .base_augmenter import BaseAugmenter, AugmentedSample
 
 
 class EDAAugmenter(BaseAugmenter):
@@ -20,63 +15,92 @@ class EDAAugmenter(BaseAugmenter):
 
     def __init__(
         self,
-        operations: list[str] | None = None,
         alpha: float = 0.1,
-        num_aug: int = 1,
+        num_aug: int = 2,
+        operations: list[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.operations = operations or ["random_swap", "random_deletion", "random_insertion"]
         self.alpha = alpha
         self.num_aug = num_aug
-        self.random = random.Random(self.random_state)
+        self.operations = operations or ["SR", "RI", "RS", "RD"]
+        self.synonyms = build_synonym_dict()
+
+    def _segment(self, text: str) -> list[str]:
+        return word_tokenize(text, format='text').split()
+
+    def _rejoin(self, tokens: list[str]) -> str:
+        return ' '.join(t.replace('_', ' ') for t in tokens)
+
+    def _sr(self, tokens: list[str], n: int) -> list[str]:
+        new = tokens.copy()
+        candidates = [t for t in tokens if t in self.synonyms]
+        random.shuffle(candidates)
+        for word in candidates[:n]:
+            if word in new:
+                idx = new.index(word)
+                new[idx] = random.choice(self.synonyms[word])
+        return new
+
+    def _ri(self, tokens: list[str], n: int) -> list[str]:
+        new = tokens.copy()
+        candidates = [t for t in tokens if t in self.synonyms]
+        for _ in range(n):
+            if not candidates:
+                break
+            word = random.choice(candidates)
+            syn = random.choice(self.synonyms[word])
+            new.insert(random.randint(0, len(new)), syn)
+        return new
+
+    def _rs(self, tokens: list[str], n: int) -> list[str]:
+        new = tokens.copy()
+        for _ in range(n):
+            if len(new) >= 2:
+                i, j = random.sample(range(len(new)), 2)
+                new[i], new[j] = new[j], new[i]
+        return new
+
+    def _rd(self, tokens: list[str], p: float) -> list[str]:
+        new = [t for t in tokens if random.random() > p]
+        return new if new else [random.choice(tokens)]
 
     def augment_one(self, text: str, label: str) -> list[AugmentedSample]:
-        samples: list[AugmentedSample] = []
-        for idx in range(self.num_aug):
-            operation = self.operations[idx % len(self.operations)]
-            augmented = self._apply(operation, text)
-            samples.append(
-                AugmentedSample(
+        tokens = self._segment(text)
+        if len(tokens) < 3:
+            return []
+
+        n = max(1, int(self.alpha * len(tokens)))
+        results = []
+        used_texts = {text}
+
+        for _ in range(self.num_aug * 2):
+            op = random.choice(self.operations)
+
+            if op == 'SR':
+                aug = self._sr(tokens, n)
+            elif op == 'RI':
+                aug = self._ri(tokens, n)
+            elif op == 'RS':
+                aug = self._rs(tokens, n)
+            elif op == 'RD':
+                aug = self._rd(tokens, self.alpha)
+            else:
+                continue
+
+            out = self._rejoin(aug)
+
+            if out.strip() != text.strip() and out not in used_texts:
+                results.append(AugmentedSample(
                     original_text=text,
-                    text=augmented,
+                    text=out,
                     label=label,
                     method=self.method_name,
-                    metadata=f"operation={operation};alpha={self.alpha}",
-                )
-            )
-        return samples
+                    metadata=f"op={op}",
+                ))
+                used_texts.add(out)
 
-    def _apply(self, operation: str, text: str) -> str:
-        words = text.split()
-        if len(words) < 2:
-            return text
-        if operation == "random_swap":
-            return self._random_swap(words)
-        if operation == "random_deletion":
-            return self._random_deletion(words)
-        if operation == "random_insertion":
-            return self._random_insertion(words)
-        raise ValueError(f"Unsupported EDA operation: {operation}")
+                if len(results) >= self.num_aug:
+                    break
 
-    def _random_swap(self, words: list[str]) -> str:
-        words = words.copy()
-        swaps = max(1, int(self.alpha * len(words)))
-        for _ in range(swaps):
-            i, j = self.random.sample(range(len(words)), 2)
-            words[i], words[j] = words[j], words[i]
-        return " ".join(words)
-
-    def _random_deletion(self, words: list[str]) -> str:
-        kept = [word for word in words if self.random.random() > self.alpha]
-        if not kept:
-            kept = [self.random.choice(words)]
-        return " ".join(kept)
-
-    def _random_insertion(self, words: list[str]) -> str:
-        words = words.copy()
-        inserts = max(1, int(self.alpha * len(words)))
-        for _ in range(inserts):
-            idx = self.random.randrange(0, len(words) + 1)
-            words.insert(idx, self.random.choice(VIETNAMESE_FILLERS))
-        return " ".join(words)
+        return results

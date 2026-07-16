@@ -4,6 +4,14 @@ This repository is a reproducible research pipeline for studying whether data au
 
 Frontend, FastAPI deployment, Docker, and full MLflow tracking are intentionally postponed until the research pipeline is complete.
 
+The recommended workflow is:
+
+- GitHub stores code, notebooks, configs, and docs.
+- Hugging Face Datasets stores processed and augmented dataset versions.
+- Hugging Face Models stores final trained checkpoints.
+- Colab provides GPU compute.
+- Google Drive is optional backup, not the primary source of truth.
+
 ## Current Status
 
 Implemented:
@@ -85,6 +93,34 @@ Default paths are configured in `configs/config.yaml`:
 
 If VLSP or another private dataset is used, keep the raw file outside Git and document the local path in `configs/config.yaml`.
 
+## Hugging Face Workflow
+
+Set a token in Colab before pushing or loading private repos:
+
+```python
+import os
+from google.colab import userdata
+
+os.environ["HF_TOKEN"] = userdata.get("HF_TOKEN")
+```
+
+Default Hub repos are configured in `configs/config.yaml`:
+
+- Dataset repo: `HoaiAn001/vietnamese-hsd-combined`
+- Model repo prefix: `HoaiAn001/vietnamese-hsd`
+
+Use dataset configs to version each experiment:
+
+```text
+baseline
+bt
+eda
+llm
+combined
+```
+
+Keep the dataset private while it contains VLSP or any data that cannot be redistributed.
+
 ## Run Pipeline
 
 Create fixed splits from one normalized CSV:
@@ -93,12 +129,25 @@ Create fixed splits from one normalized CSV:
 python scripts/prepare_splits.py --input data/raw/combined.csv
 ```
 
+Create fixed splits and push them to Hugging Face:
+
+```bash
+python scripts/prepare_splits.py --input data/raw/combined.csv --push-to-hub --hf-config baseline
+```
+
 Run augmentation:
 
 ```bash
 python scripts/run_augmentation.py --method eda
 python scripts/run_augmentation.py --method bt
 python scripts/run_augmentation.py --method llm
+```
+
+Run augmentation from the Hugging Face baseline config and push a new dataset config:
+
+```bash
+python scripts/run_augmentation.py --source hf --source-hf-config baseline --method bt --push-to-hub --target-hf-config bt
+python scripts/run_augmentation.py --source hf --source-hf-config baseline --method eda --push-to-hub --target-hf-config eda
 ```
 
 LLM augmentation writes prompts to `data/augmented/llm_prompts.jsonl`. Fill generations externally, then ingest them:
@@ -113,6 +162,19 @@ Train baseline:
 python scripts/train_classifier.py --experiment baseline
 ```
 
+Train from a Hugging Face dataset config on Colab:
+
+```bash
+python scripts/train_classifier.py --source hf --hf-config baseline --experiment baseline
+python scripts/train_classifier.py --source hf --hf-config bt --experiment bt_only
+```
+
+Train and push the checkpoint to Hugging Face Models:
+
+```bash
+python scripts/train_classifier.py --source hf --hf-config bt --experiment bt_only --push-model-to-hub
+```
+
 Train with one augmentation set:
 
 ```bash
@@ -123,6 +185,12 @@ Evaluate:
 
 ```bash
 python scripts/evaluate_model.py --model-dir saved_models/baseline --experiment baseline
+```
+
+Evaluate using a Hugging Face dataset config:
+
+```bash
+python scripts/evaluate_model.py --source hf --hf-config baseline --model-dir saved_models/baseline --experiment baseline
 ```
 
 Summarize ablation:

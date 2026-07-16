@@ -8,6 +8,7 @@ import pandas as pd
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, Trainer
 
 from src.models.training import HSDDataset, ID_TO_LABEL
+from src.utils.hf import load_hf_splits
 from src.utils.io import load_config, read_table, write_json, write_table
 from src.utils.metrics import compute_classification_metrics, confusion_matrix_frame
 from src.utils.preprocess import clean_hsd_frame
@@ -18,13 +19,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", default="configs/config.yaml")
     parser.add_argument("--model-dir", required=True)
     parser.add_argument("--experiment", required=True)
+    parser.add_argument("--source", choices=["local", "hf"], default="local")
+    parser.add_argument("--hf-config", default="baseline")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     config = load_config(args.config)
-    test = clean_hsd_frame(read_table(config["data"]["test_file"]))
+    if args.source == "hf":
+        test = clean_hsd_frame(load_hf_splits(config, args.hf_config)["test"])
+    else:
+        test = clean_hsd_frame(read_table(config["data"]["test_file"]))
     tokenizer = AutoTokenizer.from_pretrained(args.model_dir, use_fast=False)
     model = AutoModelForSequenceClassification.from_pretrained(args.model_dir)
     dataset = HSDDataset(test, tokenizer, config["training"]["max_length"])

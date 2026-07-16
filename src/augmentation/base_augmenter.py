@@ -19,7 +19,6 @@ class AugmentedSample:
 
 
 class BaseAugmenter(ABC):
-    """Common interface for all text augmentation strategies."""
 
     method_name = "base"
 

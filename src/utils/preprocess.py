@@ -58,3 +58,5 @@ def label_distribution(df: pd.DataFrame) -> pd.DataFrame:
     counts = df["label"].value_counts().reindex(VALID_LABELS, fill_value=0)
     pct = (counts / max(len(df), 1)).round(4)
     return pd.DataFrame({"label": counts.index, "count": counts.values, "ratio": pct.values})
+
+preprocess_text = normalize_text
