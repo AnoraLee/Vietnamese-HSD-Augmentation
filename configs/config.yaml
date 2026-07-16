@@ -24,7 +24,7 @@ data:
   private_vlsp_file: null
 
 huggingface:
-  dataset_repo_id: HoaiAn001/vietnamese-hsd-combined
+  dataset_repo_id: HoaiAn001/tdtu-vietnamese-hsd
   model_repo_prefix: HoaiAn001/vietnamese-hsd
   private: true
   baseline_config: baseline

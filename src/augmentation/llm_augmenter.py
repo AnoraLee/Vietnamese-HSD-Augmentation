@@ -7,13 +7,6 @@ from .base_augmenter import AugmentedSample, BaseAugmenter
 
 
 class LLMAugmenter(BaseAugmenter):
-    """Build controlled LLM augmentation prompts and ingest generated rewrites.
-
-    This class intentionally separates prompt logging from generation so the
-    project can run without a paid API key. Generated outputs can be filled in
-    later from the prompt log and merged through `from_generated_pairs`.
-    """
-
     method_name = "llm"
 
     def __init__(

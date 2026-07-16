@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
 
-
 LABEL_NAMES = ["CLEAN", "OFFENSIVE", "HATE"]
 
 
@@ -49,3 +48,22 @@ def metrics_for_trainer(eval_pred: Any) -> dict[str, float]:
 
 def confusion_matrix_frame(matrix: list[list[int]]) -> pd.DataFrame:
     return pd.DataFrame(matrix, index=LABEL_NAMES, columns=LABEL_NAMES)
+
+
+def compute_metrics(y_true, y_pred):
+    if isinstance(y_true, pd.Series):
+        y_true = y_true.tolist()
+    if isinstance(y_pred, pd.Series):
+        y_pred = y_pred.tolist()
+    return compute_classification_metrics(y_true, y_pred)
+
+
+def print_metrics(metrics, title="Metrics"):
+    print(f"\n{'='*50}")
+    print(f"{title}")
+    print(f"{'='*50}")
+    print(f"  Accuracy   : {metrics['accuracy']:.4f}")
+    print(f"  Macro F1   : {metrics['macro_f1']:.4f}")
+    print(f"  Weighted F1: {metrics['weighted_f1']:.4f}")
+    print(f"  Hate F1    : {metrics['hate_f1']:.4f}")
+    print(f"{'='*50}\n")
