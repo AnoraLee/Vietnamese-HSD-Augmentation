@@ -19,17 +19,11 @@ __pycache__/
 data/raw/*
 data/processed/*
 data/augmented/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/augmented/.gitkeep
 
 saved_models/*
-!saved_models/.gitkeep
 
 results/metrics/*
-!results/metrics/.gitkeep
 results/error_analysis/*
-!results/error_analysis/.gitkeep
 results/figures/*.png
 results/figures/*.pdf
 

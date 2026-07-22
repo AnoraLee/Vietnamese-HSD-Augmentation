@@ -25,8 +25,6 @@ def back_translate(text: str, pivot: str = 'en', delay: float = 0.5) -> str:
 
 
 def main():
-    print("Starting Back Translation...")
-    
     config = load_config()
     bt_config = config['augmentation']['back_translation']
     hf_config = config['huggingface']
