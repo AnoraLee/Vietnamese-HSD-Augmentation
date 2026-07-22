@@ -9,7 +9,6 @@ sentencepiece==0.2.0
 deep-translator==1.11.4
 sacrebleu==2.4.2
 underthesea
-torch==2.11.0
 scikit-learn==1.6.3
 matplotlib==3.9.0
 seaborn==0.13.2
