@@ -1,4 +1,4 @@
-# Vietnamese Hate Speech Detection Augmentation!
+# Vietnamese Hate Speech Detection Augmentation
 
 This repository is a reproducible research pipeline for studying whether data augmentation improves Vietnamese Hate Speech Detection (HSD). The current implementation focuses on a solid research deliverable by the end of August 2026: fixed data splits, BT/EDA/LLM augmentation outputs, PhoBERT training, ablation metrics, and error analysis.
 
