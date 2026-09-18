@@ -19,7 +19,6 @@ from api.schemas import (
 )
 from src.services.inference import HSDInferenceService 
 from src.utils.constants import LABELS, HF_MODEL_IDS
-from src.utils.preprocess import PreprocessingSetupError
 
 MODEL_EXPERIMENT = os.getenv("MODEL_EXPERIMENT", "combined")
 
