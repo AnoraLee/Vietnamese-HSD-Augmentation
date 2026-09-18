@@ -24,7 +24,8 @@ data:
   private_vlsp_file: null
 
 preprocessing:
-  vncorenlp_dir: vncorenlp
+  engine: underthesea
+  teencode_normalization: true
 
 huggingface:
   dataset_repo_id: BonTori/tdtu_vietnamese_hsd_final

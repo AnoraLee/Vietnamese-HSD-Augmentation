@@ -33,18 +33,6 @@ def cors_origins_from_environment() -> list[str]:
         return DEFAULT_CORS_ORIGINS
     return [origin.strip() for origin in configured_origins.split(",") if origin.strip()]
 
-app = FastAPI(
-    title="Vietnamese Hate Speech Detection API",
-    description=f"Serving the '{MODEL_EXPERIMENT}' PhoBERT model.",
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins_from_environment(),
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type"],
-)
-
 _inference_service: HSDInferenceService | None = None
 
 
@@ -63,10 +51,20 @@ async def lifespan(app: FastAPI):
     
     yield 
 
+# Khởi tạo FastAPI duy nhất 1 lần
 app = FastAPI(
     title="Vietnamese Hate Speech Detection API",
     description=f"Serving the '{MODEL_EXPERIMENT}' PhoBERT model.",
     lifespan=lifespan,
+)
+
+# Thêm Middleware ngay sau khi khởi tạo app
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins_from_environment(),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -84,12 +82,7 @@ def _predict_one(text: str) -> PredictResponse:
 
     try:
         result = _inference_service.predict(text)
-    except PreprocessingSetupError as exc:
-        logger.exception("Preprocessing runtime is unavailable.")
-        raise HTTPException(
-            status_code=503,
-            detail={"code": "preprocessing_unavailable", "message": str(exc)},
-        ) from exc
+    # Đã xóa PreprocessingSetupError, chỉ giữ lại xử lý lỗi chung
     except RuntimeError as exc:
         logger.exception("Model inference failed.")
         raise HTTPException(
@@ -122,7 +115,8 @@ def metadata() -> ModelMetadataResponse:
         device=_inference_service.device,
         labels=LABELS,
         max_length=_inference_service.max_length,
-        preprocessing="VnCoreNLP word segmentation with teencode normalization",
+        # Đã cập nhật lại thông tin Metadata
+        preprocessing="Underthesea word segmentation with teencode normalization",
     )
 
 
