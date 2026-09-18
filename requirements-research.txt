@@ -1,0 +1,15 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+streamlit
+
+datasets
+accelerate
+huggingface_hub
+sentencepiece
+sacremoses
+
+sentence-transformers
+youtube-comment-downloader

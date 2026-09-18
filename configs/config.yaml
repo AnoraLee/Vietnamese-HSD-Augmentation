@@ -1,0 +1,86 @@
+project:
+  name: vietnamese-hsd-augmentation
+  seed: 42
+  label_names:
+    - CLEAN
+    - OFFENSIVE
+    - HATE
+
+paths:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  augmented_dir: data/augmented
+  metrics_dir: results/metrics
+  figures_dir: results/figures
+  error_analysis_dir: results/error_analysis
+  models_dir: models
+
+data:
+  train_file: data/processed/train.csv
+  dev_file: data/processed/dev.csv
+  test_file: data/processed/test.csv
+  text_column: text
+  label_column: label
+  private_vlsp_file: null
+
+preprocessing:
+  vncorenlp_dir: vncorenlp
+
+huggingface:
+  dataset_repo_id: BonTori/tdtu_vietnamese_hsd_final
+  model_repo_prefix: BonTori/vietnamese-hsd
+  private: true
+  baseline_config: default
+  split_names:
+    train: tdtu_train
+    dev: tdtu_dev
+    test: tdtu_test
+  revision: null
+
+augmentation:
+  samples_per_label:
+    CLEAN: 0
+    OFFENSIVE: 500
+    HATE: 500
+  back_translation:
+    intermediate_language: en
+    source_language: vi
+    max_samples: 1000
+    output_file: data/augmented/aug_bt.csv
+  eda:
+    operations:
+      - random_swap
+      - random_deletion
+      - random_insertion
+    alpha: 0.1
+    num_aug: 1
+    output_file: data/augmented/aug_eda.csv
+  llm:
+    max_samples: 300
+    prompt_template: "Rewrite the Vietnamese sentence while preserving the same hate-speech label. Label: {label}. Sentence: {text}"
+    output_files:
+      gemma: data/augmented/aug_gemma.csv
+      qwen: data/augmented/aug_qwen.csv
+    prompt_log_file: data/augmented/llm_prompts.jsonl
+
+training:
+  model_name: vinai/phobert-base
+  max_length: 128
+  batch_size: 16
+  learning_rate: 0.00002
+  epochs: 3
+  weight_decay: 0.01
+  warmup_ratio: 0.06
+  evaluation_strategy: epoch
+  save_strategy: epoch
+  load_best_model_at_end: true
+  metric_for_best_model: macro_f1
+  output_dir_template: "models/{experiment}_phobert"
+
+experiments:
+  required:
+    - baseline
+    - bt
+    - eda
+    - llm
+    - combined
