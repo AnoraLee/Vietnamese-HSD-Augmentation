@@ -12,7 +12,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN python -c "import py_vncorenlp; py_vncorenlp.download_model(dir_abs_path='/app/vncorenlp')"
+RUN python -c "import py_vncorenlp; py_vncorenlp.download_model(save_dir='/app/vncorenlp')"
 
 COPY api/ ./api/
 COPY src/ ./src/
