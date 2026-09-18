@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 RUN apt-get update && \
-    apt-get install -y default-jre && \
+    apt-get install -y default-jre git && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -12,7 +12,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN python -c "import py_vncorenlp; py_vncorenlp.download_model(save_dir='/app/vncorenlp')"
+RUN git clone --depth 1 https://github.com/vncorenlp/VnCoreNLP.git /app/vncorenlp
 
 COPY api/ ./api/
 COPY src/ ./src/
