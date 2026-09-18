@@ -1,12 +1,9 @@
-# FastAPI inference service
 fastapi
 uvicorn[standard]
 pydantic
 
-# PhoBERT inference and Vietnamese word segmentation
 torch
 transformers
-py_vncorenlp
+underthesea
 
-# Shared configuration
 PyYAML
