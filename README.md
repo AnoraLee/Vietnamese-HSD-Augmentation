@@ -9,9 +9,9 @@ for trying them interactively.
 
 ## Quick start
 
-Requirements: Python 3.10+, Node.js, and Java 8+ (for VnCoreNLP-related
-tooling used during preprocessing — see [Installation](#installation) if
-`java -version` doesn't resolve).
+Requirements: Python 3.10+ and Node.js. Preprocessing runs on
+[underthesea](https://github.com/undertheeye/underthesea) (pure Python — no
+JVM or external runtime needed).
 
 **1. Backend** — loads all five PhoBERT checkpoints from Hugging Face Hub on
 startup, so the first run takes a few minutes and noticeably more RAM than a
@@ -64,8 +64,7 @@ Vietnamese-HSD-Augmentation/
 ├── src/
 │   ├── services/inference.py    # Shared PhoBERT inference service
 │   └── utils/                   # Configuration, preprocessing and evaluation
-├── tests/
-└── vncorenlp/                   # Local Java runtime assets (not committed)
+└── tests/
 ```
 
 ## The five experiments
@@ -147,13 +146,10 @@ Processed CSVs use `text` (Vietnamese input) and `label` (`CLEAN` /
 `OFFENSIVE` / `HATE`). Default split locations, set in `configs/config.yaml`:
 `data/processed/{train,dev,test}.csv`.
 
-Raw data, processed data, augmentation outputs, checkpoints, VnCoreNLP assets
-and generated figures are local artifacts and are not committed to Git.
+Raw data, processed data, augmentation outputs, checkpoints, and generated
+figures are local artifacts and are not committed to Git.
 
 ## Installation
-
-VnCoreNLP-related preprocessing tooling requires Java 8+ plus the VnCoreNLP
-`.jar` and its `models/` directory locally — also not committed to Git.
 
 ```powershell
 python -m venv .venv
@@ -165,26 +161,8 @@ python -m pip install -r requirements-research.txt      # + notebooks, training,
 python -m pip install -r requirements-dev.txt           # + tests
 ```
 
-Set up the local VnCoreNLP assets once, after installing dependencies. API
-startup never downloads assets automatically.
-
-```powershell
-python scripts/setup_vncorenlp.py
-java -version
-```
-
-If `java -version` isn't found, install Java 8+ and add its `bin` directory
-to `PATH`. The configured asset location is `preprocessing.vncorenlp_dir` in
-`configs/config.yaml`.
-
-The app derives `JAVA_HOME` from whatever Java is on `PATH`. If Java
-discovery is unreliable on a given Windows machine, set it explicitly before
-starting the API:
-
-```powershell
-$env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
-```
+No JVM setup or external runtime is required — `underthesea` installs like
+any other Python package and needs no post-install asset download.
 
 Dependencies are deliberately unpinned while the report is still being
 finalized, to avoid forcing resolver conflicts mid-writeup. Once the demo
@@ -198,3 +176,47 @@ Primary metrics: Macro F1, HATE F1, per-class F1, and the confusion matrix.
 Reusable implementation lives in `src/`; notebooks under `notebooks/` are kept
 for exploration, data preparation, training, and analysis — not for anything
 imported at runtime.
+
+## Results
+
+Per-experiment metrics live in `results/metrics/metrics_<experiment>.json`;
+run `python scripts/summarize_ablation.py` for a consolidated comparison
+table and chart across whichever experiments have been trained so far. Full
+discussion of the numbers belongs in the thesis report, not duplicated here —
+this repo is the source of truth for how they were produced.
+
+## Known limitations
+
+- **Preprocessing mismatch risk:** training data was originally segmented
+  with a different tokenizer (VnCoreNLP) before the project standardized on
+  `underthesea`. If any checkpoint under `models/` was fine-tuned on the
+  older segmentation, re-validate its dev/test metrics against
+  underthesea-segmented input before trusting them at face value.
+- **Back-translation augmentation** (`bt`) has a measured semantic-drift rate
+  — a meaningful share of candidate sentences were dropped for drifting from
+  the original meaning or softening the toxic content during round-trip
+  translation. See the filtering pipeline in
+  `notebooks/3_augmentation/bt_augmentation.ipynb` for the exact filters and
+  thresholds applied.
+- **`token_importance`** in the API response is attention-based (last layer,
+  averaged across heads, from the CLS token), not a validated attribution
+  method — useful for a quick visual read, not for claims about causal
+  feature importance.
+- **Word-to-subword alignment** for `token_importance` is approximate: the
+  tokenizer runs with `use_fast=False`, so there's no exact offset mapping,
+  and word boundaries are recovered by re-tokenizing each word in isolation.
+
+## Acknowledgments
+
+Built on [PhoBERT](https://github.com/VinAIResearch/PhoBERT) (VinAI
+Research), [underthesea](https://github.com/undertheeye/underthesea) for
+Vietnamese word segmentation, and
+[Helsinki-NLP/opus-mt](https://huggingface.co/Helsinki-NLP) for
+back-translation. Trained checkpoints are hosted across the team's Hugging
+Face accounts — see `src/utils/constants.py` for the exact repo IDs behind
+each experiment key.
+
+## License
+
+Not yet decided for this repository. Treat all checkpoints and data as
+private/academic-use only until a license file is added.
