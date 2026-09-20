@@ -1,8 +1,42 @@
 # Vietnamese Hate Speech Detection
 
-Vietnamese hate-speech detection with PhoBERT. The repository contains the
-research artifacts used to compare data-augmentation experiments and a local
-FastAPI/Streamlit serving layer for model demonstration.
+A PhoBERT-based classifier for Vietnamese hate speech (`CLEAN` / `OFFENSIVE` /
+`HATE`), built to compare five data-augmentation strategies side by side:
+back-translation, EDA, LLM-generated synthetic data, their combination, and a
+no-augmentation baseline. The repo includes the research notebooks, a FastAPI
+serving layer that loads all five checkpoints at once, and a React demo app
+for trying them interactively.
+
+## Quick start
+
+Requirements: Python 3.10+, Node.js, and Java 8+ (for VnCoreNLP-related
+tooling used during preprocessing — see [Installation](#installation) if
+`java -version` doesn't resolve).
+
+**1. Backend** — loads all five PhoBERT checkpoints from Hugging Face Hub on
+startup, so the first run takes a few minutes and noticeably more RAM than a
+single-model server.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+
+$env:MODEL_EXPERIMENT = "combined"   # default experiment when a request omits "model"
+python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+**2. Frontend** — in a second terminal:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`. The status badge should read **API sẵn sàng**;
+if it doesn't, check `http://127.0.0.1:8000/health` first — the error there
+is usually more specific than what reaches the browser.
 
 ## Project structure
 
@@ -14,7 +48,7 @@ Vietnamese-HSD-Augmentation/
 │   ├── raw/                     # Source datasets (not committed)
 │   ├── processed/               # train.csv, dev.csv, test.csv (not committed)
 │   └── augmented/               # Augmentation outputs (not committed)
-├── frontend/                    # demonstration app
+├── frontend/                    # React demo app
 ├── models/                      # Local PhoBERT checkpoints (not committed)
 ├── notebooks/
 │   ├── 1_data_exploration/
@@ -28,181 +62,139 @@ Vietnamese-HSD-Augmentation/
 │   └── error_analysis/
 ├── scripts/summarize_ablation.py
 ├── src/
-│   ├── models/classifier.py     # Local PhoBERT inference wrapper
+│   ├── services/inference.py    # Shared PhoBERT inference service
 │   └── utils/                   # Configuration, preprocessing and evaluation
 ├── tests/
 └── vncorenlp/                   # Local Java runtime assets (not committed)
 ```
 
-## Experiment contract
+## The five experiments
 
-The supported experiments are `baseline`, `bt`, `eda`, `llm`, and `combined`.
+| Key        | What it is                                      |
+| ---------- | ------------------------------------------------ |
+| `baseline` | PhoBERT fine-tuned on the unaugmented training set |
+| `bt`       | + back-translation augmentation                  |
+| `eda`      | + Easy Data Augmentation                          |
+| `llm`      | + LLM-generated synthetic samples                 |
+| `combined` | All three augmentation sources merged             |
 
-Each metric file follows this convention:
+These keys are used consistently across the repo:
 
-```text
-results/metrics/metrics_<experiment>.json
+- Metric files: `results/metrics/metrics_<experiment>.json`
+- Checkpoint directories: `models/<experiment>_phobert/`
+- The `model` field accepted by `POST /predict` (see [API reference](#api-reference))
+
+`scripts/summarize_ablation.py` reads whichever metric files are present and
+writes a comparison table and chart under `results/`.
+
+## API reference
+
+All five checkpoints are loaded once at startup and kept in memory, so
+switching experiments between requests costs no extra load time.
+
+**`POST /predict`**
+
+```json
+{ "text": "câu cần phân loại", "model": "combined" }
 ```
 
-For example, `results/metrics/metrics_combined.json`. The ablation summary
-script reads all available metric files and writes the comparison table and
-chart under `results/`.
+`model` is optional — omit it to use whatever `MODEL_EXPERIMENT` was set to
+at startup. Response:
 
-Model checkpoints use this convention:
-
-```text
-models/<experiment>_phobert/
+```json
+{
+  "text": "câu cần phân loại",
+  "text_cleaned": "câu cần phân_loại",
+  "label": "CLEAN",
+  "confidence": 0.94,
+  "probabilities": { "CLEAN": 0.94, "OFFENSIVE": 0.04, "HATE": 0.02 },
+  "latency_ms": 42.1,
+  "model_used": "combined",
+  "token_importance": [{ "token": "câu", "score": 0.02 }, { "token": "cần", "score": 0.05 }]
+}
 ```
 
-For example, the combined model is expected at `models/combined_phobert/`.
+`text_cleaned` is the Underthesea-segmented input (compound words joined by
+`_`) actually fed to the model. `token_importance` is an attention-based
+saliency score per word — the last transformer layer's attention from the
+CLS token, averaged across heads. Treat it as a visualization aid, not a
+rigorous attribution method (it isn't LIME or Integrated Gradients).
+
+**`POST /predict/batch`** — same shape, `{"texts": [...], "model": "..."}` in,
+`{"results": [...]}` out.
+
+**`GET /health`** — `{"status", "model", "device", "available_models"}`.
+
+**`GET /metadata`** — labels, max sequence length, preprocessing description,
+and `available_models` (the five experiment keys currently loaded).
+
+CORS allows `http://localhost:5173` and `http://127.0.0.1:5173` by default.
+Set `CORS_ORIGINS` (comma-separated) before deploying anywhere else.
+
+## React frontend
+
+Lives in `frontend/`, talks to the API via `VITE_API_BASE_URL` (defaults to
+`http://127.0.0.1:8000`, so local development needs no configuration). Lets
+you switch between the five experiments per request and see which words the
+model attended to most.
+
+For a different backend URL, copy `.env.example` to `.env.local`, set
+`VITE_API_BASE_URL`, then restart `npm run dev`.
 
 ## Data contract
 
-Processed CSV files use the columns below:
+Processed CSVs use `text` (Vietnamese input) and `label` (`CLEAN` /
+`OFFENSIVE` / `HATE`). Default split locations, set in `configs/config.yaml`:
+`data/processed/{train,dev,test}.csv`.
 
-- `text`: Vietnamese input text
-- `label`: one of `CLEAN`, `OFFENSIVE`, or `HATE`
-
-The default split locations are configured in `configs/config.yaml`:
-`data/processed/train.csv`, `data/processed/dev.csv`, and
-`data/processed/test.csv`.
-
-Raw datasets, processed data, augmentation outputs, checkpoints, VnCoreNLP
-assets and generated figures are local artifacts. They are deliberately not
-committed to Git.
+Raw data, processed data, augmentation outputs, checkpoints, VnCoreNLP assets
+and generated figures are local artifacts and are not committed to Git.
 
 ## Installation
 
-Use Python 3.10 or newer. VnCoreNLP also requires Java 8 or newer and the
-VnCoreNLP `.jar` file plus its `models/` directory on the local machine. The
-runtime assets are intentionally not stored in Git.
-
-Create and activate an isolated environment, then install the dependency set
-that matches the task:
+VnCoreNLP-related preprocessing tooling requires Java 8+ plus the VnCoreNLP
+`.jar` and its `models/` directory locally — also not committed to Git.
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 
-# FastAPI inference service only
-python -m pip install -r requirements.txt
-
-# Notebooks, training, evaluation and temporary Streamlit demo
-python -m pip install -r requirements-research.txt
-
-# Development and tests; includes the research dependencies
-python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements.txt              # FastAPI service only
+python -m pip install -r requirements-research.txt      # + notebooks, training, evaluation
+python -m pip install -r requirements-dev.txt           # + tests
 ```
 
-Prepare the local VnCoreNLP assets once after installing the runtime
-dependencies. This is an explicit setup action; API startup never downloads
-assets automatically.
+Set up the local VnCoreNLP assets once, after installing dependencies. API
+startup never downloads assets automatically.
 
 ```powershell
 python scripts/setup_vncorenlp.py
 java -version
 ```
 
-If `java -version` is not found, install Java 8+ and add its `bin` directory to
-`PATH` before running the API. The configured asset location is
-`preprocessing.vncorenlp_dir` in `configs/config.yaml`.
+If `java -version` isn't found, install Java 8+ and add its `bin` directory
+to `PATH`. The configured asset location is `preprocessing.vncorenlp_dir` in
+`configs/config.yaml`.
 
-The application derives `JAVA_HOME` from the Java executable on `PATH` for
-pyjnius. If Java discovery is unusual on a Windows machine, set it explicitly
-for the current PowerShell session before starting FastAPI:
+The app derives `JAVA_HOME` from whatever Java is on `PATH`. If Java
+discovery is unreliable on a given Windows machine, set it explicitly before
+starting the API:
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 ```
 
-Dependency versions are deliberately not pinned during the report-delivery
-period to avoid forcing an unnecessary resolver conflict. Once the demo
-environment is verified, record its resolved packages separately with
-`python -m pip freeze > requirements-lock.txt`; do not replace the unpinned
-source requirement files with that snapshot.
+Dependencies are deliberately unpinned while the report is still being
+finalized, to avoid forcing resolver conflicts mid-writeup. Once the demo
+environment is verified, snapshot it separately —
+`python -m pip freeze > requirements-lock.txt` — rather than replacing the
+source requirement files with that output.
 
-## Current entry points
+## Evaluation
 
-Summarize available experiment metrics:
-
-```bash
-python scripts/summarize_ablation.py
-```
-
-Run the API after placing a supported checkpoint under `models/`:
-
-```bash
-uvicorn api.main:app --reload
-```
-
-`MODEL_EXPERIMENT` selects the checkpoint and defaults to `combined`.
-
-```bash
-$env:MODEL_EXPERIMENT = "combined"  # PowerShell
-uvicorn api.main:app --reload
-```
-
-`POST /predict` receives `{"text": "..."}` and returns the original text,
-the VnCoreNLP-preprocessed text, predicted label, confidence, probabilities
-for all three labels, inference latency, and the selected experiment. Both the
-API and Streamlit use the same inference service and preprocessing pipeline.
-
-`GET /health` reports whether the model is ready; `GET /metadata` provides the
-selected model, labels, max length and preprocessing description for clients.
-The local React development server is allowed by default at
-`http://localhost:5173`. Set `CORS_ORIGINS` to a comma-separated allowlist
-before deploying elsewhere.
-
-## React frontend
-
-The React/Vite client lives in `frontend/` and uses `VITE_API_BASE_URL` to
-find FastAPI. It defaults to `http://127.0.0.1:8000`, so no configuration is
-needed for local development.
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Open the local URL printed by Vite, normally `http://127.0.0.1:5173`. For a
-different backend URL, copy `.env.example` to `.env.local`, update
-`VITE_API_BASE_URL`, then restart the Vite server.
-
-## Run the local application
-
-Start the backend first from the project root. `combined` is the default model;
-change `MODEL_EXPERIMENT` only when the matching checkpoint exists under
-`models/`.
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-$env:MODEL_EXPERIMENT = "combined"
-python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-In a second PowerShell terminal, start the React client:
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-Open `http://127.0.0.1:5173`. The status badge should show **API sẵn sàng**.
-If it does not, first open `http://127.0.0.1:8000/health` to read the backend
-error before troubleshooting the browser client.
-
-The temporary Streamlit demo can be run with:
-
-```bash
-streamlit run app/app.py
-```
-
-## Evaluation priorities
-
-Primary research metrics are Macro F1, HATE F1, per-class F1 and the confusion
-matrix. Reusable implementation belongs in `src/`; notebooks are retained for
-exploration, data preparation, training and analysis.
+Primary metrics: Macro F1, HATE F1, per-class F1, and the confusion matrix.
+Reusable implementation lives in `src/`; notebooks under `notebooks/` are kept
+for exploration, data preparation, training, and analysis — not for anything
+imported at runtime.
