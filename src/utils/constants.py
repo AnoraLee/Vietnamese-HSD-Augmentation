@@ -4,10 +4,10 @@ id2label = {i: label for label, i in label2id.items()}
 
 HF_MODEL_IDS = {
     "baseline": "BonTori/phobert-baseline-retrain-hsd",
-    "bt": "AnoraLee/vietnamese-hsd-phobert-combined",
+    "bt": "AnoraLee/vietnamese-hsd-phobert-bt",
     "eda": "BonTori/phobert-eda-retrain-hsd",
     "llm": "BonTori/phobert-llm-segmented-hsd",
-    "combined": "AnoraLee/vietnamese-hsd-phobert-bt",
+    "combined": "AnoraLee/vietnamese-hsd-phobert-combined",
 }
 
 EXPERIMENT_ORDER = ["baseline", "bt", "eda", "llm", "combined"]

@@ -3,6 +3,16 @@ from pydantic import BaseModel, Field
 
 class PredictRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000, description="Vietnamese text to classify")
+    model: str | None = Field(
+        default=None,
+        description="Experiment key to run (baseline / bt / eda / llm / combined). "
+        "Falls back to the server's default MODEL_EXPERIMENT when omitted.",
+    )
+
+
+class TokenImportance(BaseModel):
+    token: str
+    score: float
 
 
 class PredictResponse(BaseModel):
@@ -13,10 +23,12 @@ class PredictResponse(BaseModel):
     probabilities: dict[str, float]
     latency_ms: float
     model_used: str
+    token_importance: list[TokenImportance] = Field(default_factory=list)
 
 
 class BatchPredictRequest(BaseModel):
     texts: list[str] = Field(..., min_length=1, max_length=100)
+    model: str | None = None
 
 
 class BatchPredictResponse(BaseModel):
@@ -27,6 +39,7 @@ class HealthResponse(BaseModel):
     status: str
     model: str
     device: str
+    available_models: list[str] = Field(default_factory=list)
 
 
 class ModelMetadataResponse(BaseModel):
@@ -35,3 +48,4 @@ class ModelMetadataResponse(BaseModel):
     labels: list[str]
     max_length: int
     preprocessing: str
+    available_models: list[str] = Field(default_factory=list)
