@@ -202,10 +202,10 @@ function ModelWorkspace({ activeModel, onSelectModel }) {
   );
 }
 
-function EvaluationWorkspace() {
+function EvaluationWorkspace({ activeModel }) {
   const bestMacro = EVALUATION_METRICS.reduce((best, item) => item.macroF1 > best.macroF1 ? item : best);
   const bestHate = EVALUATION_METRICS.reduce((best, item) => item.hateF1 > best.hateF1 ? item : best);
-  const selected = EVALUATION_METRICS.find((item) => item.experiment === "combined");
+  const selected = EVALUATION_METRICS.find((item) => item.experiment === activeModel) ?? EVALUATION_METRICS[0];
   const largestError = COMBINED_ERRORS[0];
   return (
     <div className="workspace-view workspace-view--evaluation">
@@ -217,8 +217,8 @@ function EvaluationWorkspace() {
         </div>
         <div className="evaluation-stamp">LIVE<br /><b>RESULTS</b></div>
       </div>
-      <div className="metric-spotlight">
-        <div><span>MODEL ĐANG CHỌN</span><strong>Combined</strong><small>hate-F1 cao nhất</small></div>
+      <div className={`metric-spotlight metric-spotlight--${selected.experiment}`}>
+        <div><span>MODEL ĐANG CHỌN</span><strong>{selected.experiment.toUpperCase()}</strong><small>kết quả theo model đang dùng</small></div>
         <div><span>ACCURACY</span><strong>{formatPercent(selected.accuracy)}</strong><small>test set</small></div>
         <div><span>MACRO-F1 TỐT NHẤT</span><strong>{formatPercent(bestMacro.macroF1)}</strong><small>{bestMacro.experiment.toUpperCase()}</small></div>
         <div><span>HATE-F1 TỐT NHẤT</span><strong>{formatPercent(bestHate.hateF1)}</strong><small>{bestHate.experiment.toUpperCase()}</small></div>
@@ -228,8 +228,8 @@ function EvaluationWorkspace() {
         <div className="evaluation-table" role="table">
           <div className="evaluation-row evaluation-row--head" role="row"><span>EXPERIMENT</span><span>ACCURACY</span><span>MACRO-F1</span><span>WEIGHTED-F1</span><span>HATE-F1</span></div>
           {[...EVALUATION_METRICS].sort((a, b) => b.accuracy - a.accuracy).map((item) => (
-            <div className={`evaluation-row${item.experiment === "combined" ? " evaluation-row--active" : ""}`} key={item.experiment} role="row">
-              <span><i className={`run-dot run-dot--${item.experiment}`} />{item.experiment}</span>
+            <div className={`evaluation-row evaluation-row--${item.experiment}${item.experiment === selected.experiment ? " evaluation-row--active" : ""}`} key={item.experiment} role="row">
+              <span>{item.experiment}</span>
               <span>{formatPercent(item.accuracy)}</span><span>{formatPercent(item.macroF1)}</span><span>{formatPercent(item.weightedF1)}</span><span>{formatPercent(item.hateF1)}</span>
             </div>
           ))}
@@ -709,7 +709,7 @@ export default function App() {
         <main className="chat-messages">
           {activeTool !== "classifier" || messages.length === 0 ? (
             activeTool === "models" ? <ModelWorkspace activeModel={model} onSelectModel={setModel} />
-            : activeTool === "evaluation" ? <EvaluationWorkspace />
+            : activeTool === "evaluation" ? <EvaluationWorkspace activeModel={model} />
             : <div className={`empty-chat-greeting${activeTool !== "classifier" ? " tool-view" : ""}`}>
               <span className="tool-view-kicker">HSD / {activeTool.toUpperCase()}</span>
               <h1>{selectedTool.title}</h1>

@@ -322,7 +322,13 @@ button { outline: none; }
 .metric-spotlight > div:first-child { background: linear-gradient(135deg, #12335a, var(--bg-panel)); }
 .metric-spotlight span { display: block; color: var(--muted); font: 500 .58rem "DM Mono", monospace; letter-spacing: .08em; }
 .metric-spotlight strong { display: block; margin-top: 13px; color: var(--text); font: 700 1.35rem "Space Grotesk", sans-serif; }
-.metric-spotlight > div:first-child strong { color: var(--blue); }
+.metric-spotlight { --evaluation-accent: var(--blue); }
+.metric-spotlight--baseline { --evaluation-accent: #5dafff; }
+.metric-spotlight--bt { --evaluation-accent: #b193ff; }
+.metric-spotlight--eda { --evaluation-accent: #e7b65f; }
+.metric-spotlight--llm { --evaluation-accent: #ed8cae; }
+.metric-spotlight--combined { --evaluation-accent: #4ed0a2; }
+.metric-spotlight > div:first-child strong { color: var(--evaluation-accent); }
 .metric-spotlight small { display: block; margin-top: 4px; color: var(--muted); font-size: .62rem; }
 .evaluation-stamp { padding: 11px 13px; border: 1px solid var(--clean); border-radius: 4px; color: var(--clean); font: .57rem/1.45 "DM Mono", monospace; letter-spacing: .1em; text-align: center; }
 .evaluation-stamp b { font-size: .7rem; }
@@ -332,6 +338,13 @@ button { outline: none; }
 .evaluation-row:last-child { border-bottom: 0; }
 .evaluation-row--head { min-height: 37px; color: var(--muted); font-size: .57rem; }
 .evaluation-row--active { color: var(--text); background: rgba(60, 155, 255, .08); }
+.evaluation-row--baseline { --evaluation-accent: #5dafff; }
+.evaluation-row--bt { --evaluation-accent: #b193ff; }
+.evaluation-row--eda { --evaluation-accent: #e7b65f; }
+.evaluation-row--llm { --evaluation-accent: #ed8cae; }
+.evaluation-row--combined { --evaluation-accent: #4ed0a2; }
+.evaluation-row:not(.evaluation-row--head) { border-left: 3px solid var(--evaluation-accent); }
+.evaluation-row:not(.evaluation-row--head) > span:first-child { color: var(--evaluation-accent); }
 .evaluation-row > span:not(:first-child) { text-align: right; }
 .run-dot { display: inline-block; width: 6px; height: 6px; margin-right: 9px; border-radius: 50%; background: var(--muted); }
 .run-dot--baseline { background: #5dafff; } .run-dot--bt { background: #b193ff; } .run-dot--eda { background: #e7b65f; } .run-dot--llm { background: #ed8cae; } .run-dot--combined { background: #4ed0a2; }
