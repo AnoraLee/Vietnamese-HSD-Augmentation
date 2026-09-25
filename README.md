@@ -4,7 +4,7 @@ A PhoBERT-based classifier for Vietnamese hate speech (`CLEAN` / `OFFENSIVE` /
 `HATE`), built to compare five data-augmentation strategies side by side:
 back-translation, EDA, LLM-generated synthetic data, their combination, and a
 no-augmentation baseline. The repo includes the research notebooks, a FastAPI
-serving layer that loads all five checkpoints at once, and a React demo app
+serving layer that loads one selected checkpoint at a time, and a React demo app
 for trying them interactively.
 
 ## Quick start
@@ -13,9 +13,8 @@ Requirements: Python 3.10+ and Node.js. Preprocessing runs on
 [underthesea](https://github.com/undertheeye/underthesea) (pure Python — no
 JVM or external runtime needed).
 
-**1. Backend** — loads all five PhoBERT checkpoints from Hugging Face Hub on
-startup, so the first run takes a few minutes and noticeably more RAM than a
-single-model server.
+**1. Backend** — loads one PhoBERT checkpoint from Hugging Face Hub on
+startup. This keeps RAM and VRAM usage manageable on local machines.
 
 ```powershell
 python -m venv .venv
@@ -88,8 +87,13 @@ writes a comparison table and chart under `results/`.
 
 ## API reference
 
-All five checkpoints are loaded once at startup and kept in memory, so
-switching experiments between requests costs no extra load time.
+Only the checkpoint selected by `MODEL_EXPERIMENT` is loaded at startup. To
+switch experiments, stop the backend, set the variable, and start it again:
+
+```powershell
+$env:MODEL_EXPERIMENT = "combined"  # baseline / bt / eda / llm / combined
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+```
 
 **`POST /predict`**
 
@@ -125,7 +129,7 @@ rigorous attribution method (it isn't LIME or Integrated Gradients).
 **`GET /health`** — `{"status", "model", "device", "available_models"}`.
 
 **`GET /metadata`** — labels, max sequence length, preprocessing description,
-and `available_models` (the five experiment keys currently loaded).
+and `available_models` (the experiment keys currently loaded, normally one).
 
 CORS allows `http://localhost:5173` and `http://127.0.0.1:5173` by default.
 Set `CORS_ORIGINS` (comma-separated) before deploying anywhere else.

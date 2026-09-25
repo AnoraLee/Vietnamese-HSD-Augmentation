@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 from pathlib import Path
+from time import perf_counter
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +13,8 @@ sys.path.insert(0, str(PROJECT_DIR))
 from api.schemas import (
     BatchPredictRequest,
     BatchPredictResponse,
+    ExplainRequest,
+    ExplainResponse,
     HealthResponse,
     ModelMetadataResponse,
     PredictRequest,
@@ -50,13 +53,20 @@ async def lifespan(app: FastAPI):
             f"Expected one of {list(HF_MODEL_IDS)}."
         )
 
-    for experiment_name in EXPERIMENT_ORDER:
+    for experiment_name in [MODEL_EXPERIMENT]:
         hf_model_id = HF_MODEL_IDS[experiment_name]
         print(f"[{experiment_name}] loading from Hugging Face: {hf_model_id}")
-        _inference_services[experiment_name] = HSDInferenceService(hf_model_id)
+        service = HSDInferenceService(hf_model_id)
+        service.warm_up()
+        if experiment_name == MODEL_EXPERIMENT:
+            service.explain_with_shap("không độc hại", max_evals=20, predicted_id=0)
+        _inference_services[experiment_name] = service
         print(f"[{experiment_name}] ready.")
 
-    print(f"All {len(_inference_services)} experiments loaded. Default: {MODEL_EXPERIMENT!r}")
+    print(
+        f"Loaded {len(_inference_services)} model(s): {list(_inference_services)}. "
+        f"Default: {MODEL_EXPERIMENT!r}"
+    )
 
     yield
 
@@ -164,4 +174,55 @@ def predict(request: PredictRequest):
 def predict_batch(request: BatchPredictRequest):
     return BatchPredictResponse(
         results=[_predict_one(text, request.model) for text in request.texts]
+    )
+
+def _default_max_evals(device: str) -> int:
+    """SHAP on CPU with PhoBERT-base is roughly 15-30x slower than on GPU.
+    Pick a budget that keeps response time tolerable on the actual device."""
+    return 200 if device.startswith("cuda") else 80
+
+
+@app.post("/explain", response_model=ExplainResponse)
+def explain(request: ExplainRequest):
+    """SHAP-based explanation -- opt-in only.
+
+    Runs hundreds of forward passes, so never call this from /predict.
+    The frontend triggers it explicitly via a disclosure button, and
+    toggles it back off without re-fetching (results are cached client-side).
+    """
+    if not _inference_services:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "model_unavailable", "message": "Models are not loaded yet."},
+        )
+    if not request.text.strip():
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_text", "message": "Text must contain non-whitespace characters."},
+        )
+
+    started_at = perf_counter()
+    resolved_key, service = _resolve_service(request.model)
+
+    max_evals = request.max_evals or _default_max_evals(service.device)
+
+    try:
+        prediction = service.predict(request.text)
+        predicted_id = LABELS.index(prediction["label"])
+        token_scores = service.explain_with_shap(
+            request.text,
+            max_evals=max_evals,
+            predicted_id=predicted_id,
+        )
+    except RuntimeError as exc:
+        logger.exception("SHAP explanation failed.")
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "explain_failed", "message": str(exc) or "Explanation could not be completed."},
+        ) from exc
+
+    return ExplainResponse(
+        label=prediction["label"],
+        token_scores=token_scores,
+        latency_ms=round((perf_counter() - started_at) * 1000, 2),
     )

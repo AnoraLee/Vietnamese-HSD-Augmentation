@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from time import perf_counter
 
+import numpy as np
 import torch
+
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from src.utils.config import load_config
@@ -33,10 +35,21 @@ class HSDInferenceService:
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path, use_fast=False)
         self.model = AutoModelForSequenceClassification.from_pretrained(
             self.model_name_or_path,
-            attn_implementation="eager",  # "sdpa" (mặc định ở bản transformers mới) không hỗ trợ
-                                           # output_attentions=True -- cần "eager" để lấy attention weights
         ).to(self.device)
         self.model.eval()
+        self._shap_explainer = None
+        self._shap_cache: dict[tuple[str, int, int], list[dict]] = {}
+
+    def warm_up(self) -> None:
+        """Initialize the model device before the first user request."""
+        encoded = self.tokenizer(
+            "không độc hại",
+            truncation=True,
+            max_length=self.max_length,
+            return_tensors="pt",
+        ).to(self.device)
+        with torch.inference_mode():
+            self.model(**encoded)
 
     def predict(self, text: str) -> dict:
         """Preprocess text, run inference, and return JSON-serializable values."""
@@ -51,12 +64,11 @@ class HSDInferenceService:
         ).to(self.device)
 
         with torch.inference_mode():
-            outputs = self.model(**encoded, output_attentions=True)
+            outputs = self.model(**encoded)
             probabilities = torch.softmax(outputs.logits, dim=-1)[0]
 
         probability_values = [float(value) for value in probabilities.cpu().tolist()]
         predicted_id = int(probabilities.argmax())
-        token_importance = self._token_importance(text_cleaned, encoded, outputs.attentions)
 
         return {
             "text": text,
@@ -65,7 +77,7 @@ class HSDInferenceService:
             "confidence": probability_values[predicted_id],
             "probabilities": dict(zip(LABELS, probability_values, strict=True)),
             "latency_ms": round((perf_counter() - started_at) * 1000, 2),
-            "token_importance": token_importance,
+            "token_importance": [],
         }
 
     def _token_importance(self, text_cleaned: str, encoded, attentions) -> list[dict]:
@@ -111,3 +123,66 @@ class HSDInferenceService:
             cursor = end
 
         return [{"token": word, "score": score} for word, score in zip(words, scores)]
+
+    def _predict_proba_for_shap(self, masked_texts) -> np.ndarray:
+        encoded = self.tokenizer(
+            list(masked_texts),
+            truncation=True,
+            padding=True,
+            max_length=self.max_length,
+            return_tensors="pt",
+        ).to(self.device)
+        with torch.inference_mode():
+            logits = self.model(**encoded).logits
+        return torch.softmax(logits, dim=-1).cpu().numpy()
+
+    def explain_with_shap(
+        self,
+        text: str,
+        max_evals: int = 80,
+        predicted_id: int | None = None,
+    ) -> list[dict]:
+        import logging
+
+        import shap
+
+        logger = logging.getLogger(__name__)
+
+        text_cleaned = self.preprocessor.clean_text(text)
+        if not text_cleaned.strip():
+            return []
+
+        cache_key = (text_cleaned, max_evals, predicted_id if predicted_id is not None else -1)
+        cached_scores = self._shap_cache.get(cache_key)
+        if cached_scores is not None:
+            return cached_scores
+
+        if self._shap_explainer is None:
+            masker = shap.maskers.Text(tokenizer=r"\s+")
+            self._shap_explainer = shap.Explainer(
+                self._predict_proba_for_shap,
+                masker,
+                algorithm="partition",
+                output_names=LABELS,
+                seed=7,
+            )
+
+        try:
+            shap_values = self._shap_explainer([text_cleaned], max_evals=max_evals)
+        except Exception as exc:
+            logger.exception("SHAP explainer failed.")
+            raise RuntimeError(f"SHAP explainer failed: {exc}") from exc
+
+        if predicted_id is None:
+            predicted_id = int(np.argmax(self._predict_proba_for_shap([text_cleaned])[0]))
+        sv = shap_values[0, :, predicted_id]
+
+        token_scores = [
+            {"token": str(token).strip(), "score": float(score)}
+            for token, score in zip(sv.data, sv.values)
+            if str(token).strip()
+        ]
+        self._shap_cache[cache_key] = token_scores
+        if len(self._shap_cache) > 32:
+            self._shap_cache.pop(next(iter(self._shap_cache)))
+        return token_scores

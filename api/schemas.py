@@ -26,6 +26,27 @@ class PredictResponse(BaseModel):
     token_importance: list[TokenImportance] = Field(default_factory=list)
 
 
+class ExplainRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=2000)
+    model: str | None = Field(default=None, description="Same experiment keys as PredictRequest.")
+    max_evals: int | None = Field(
+        default=None,
+        ge=20,
+        le=1000,
+        description=(
+            "SHAP budget (số forward pass tối đa). "
+            "Bỏ trống → backend tự chọn theo device. "
+            "Khuyến nghị: 50 (CPU yếu), 100 (CPU khá), 200-300 (GPU)."
+        ),
+    )
+
+class ExplainResponse(BaseModel):
+    label: str
+    method: str = "shap"
+    token_scores: list[TokenImportance]
+    latency_ms: float
+
+
 class BatchPredictRequest(BaseModel):
     texts: list[str] = Field(..., min_length=1, max_length=100)
     model: str | None = None

@@ -9,6 +9,7 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "lucide-react": "^1.48.0",
     "react": "latest",
     "react-dom": "latest"
   },

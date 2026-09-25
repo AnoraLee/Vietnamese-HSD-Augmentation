@@ -19,7 +19,17 @@ class FakeInferenceService:
 
 
 def client_with_fake_service(monkeypatch) -> TestClient:
-    monkeypatch.setattr(api_main, "_inference_service", FakeInferenceService())
+    mock_service = FakeInferenceService()
+    from api.main import MODEL_EXPERIMENT 
+    
+    fake_services_dict = {
+        MODEL_EXPERIMENT: mock_service,
+        "combined": mock_service, 
+        "baseline": mock_service  
+    }
+    
+    monkeypatch.setattr("api.main._inference_services", fake_services_dict)
+    
     return TestClient(api_main.app)
 
 
