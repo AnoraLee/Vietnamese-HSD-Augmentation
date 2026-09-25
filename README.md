@@ -46,7 +46,7 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 
 $env:MODEL_EXPERIMENT = "combined"   # default when a request omits "model"
-python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 **2. Frontend** — in a second terminal:
