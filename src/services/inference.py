@@ -1,21 +1,33 @@
-"""Canonical PhoBERT inference service used by every application entry point."""
-
 from __future__ import annotations
 
+import logging
+import os
+import threading
+from collections import OrderedDict
 from time import perf_counter
+from typing import Any
 
 import numpy as np
 import torch
-
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from src.utils.config import load_config
-from src.utils.constants import LABELS
+from src.utils.constants import (
+    HF_TOKEN_ENV,
+    LABELS,
+    TRAINING_MAX_LENGTH,
+    needs_slow_tokenizer,
+)
 from src.utils.preprocess import TextPreprocessor, get_text_preprocessor
+
+logger = logging.getLogger(__name__)
+
+_WARMUP_TEXT = "không độc hại"
+
+_SHAP_CACHE_SIZE = 32
 
 
 class HSDInferenceService:
-    """Load one checkpoint and return a stable, UI-agnostic prediction payload."""
+    """Load model 1 lần, serve predictions + SHAP explanations."""
 
     def __init__(
         self,
@@ -23,40 +35,56 @@ class HSDInferenceService:
         device: str | None = None,
         max_length: int | None = None,
         preprocessor: TextPreprocessor | None = None,
+        hf_token: str | None = None,
     ) -> None:
         self.model_name_or_path = str(model_name_or_path)
-
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.max_length = max_length or load_config()["training"]["max_length"]
+        self.max_length = max_length or TRAINING_MAX_LENGTH
         self.preprocessor = preprocessor or get_text_preprocessor()
+        self._hf_token = hf_token or os.environ.get(HF_TOKEN_ENV)
+        self._slow_tokenizer = needs_slow_tokenizer(self.model_name_or_path)
+        self._shap_explainer: Any | None = None
+        self._shap_cache: OrderedDict[tuple, list[dict]] = OrderedDict()
+        self._cache_lock = threading.Lock()
 
-        print(f"Loading model on {self.device}: {self.model_name_or_path}")
-
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path, use_fast=False)
+        logger.info("Loading model on %s: %s", self.device, self.model_name_or_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.model_name_or_path,
+            use_fast=not self._slow_tokenizer,
+            token=self._hf_token,
+        )
         self.model = AutoModelForSequenceClassification.from_pretrained(
             self.model_name_or_path,
+            token=self._hf_token,
         ).to(self.device)
         self.model.eval()
-        self._shap_explainer = None
-        self._shap_cache: dict[tuple[str, int, int], list[dict]] = {}
 
-    def warm_up(self) -> None:
-        """Initialize the model device before the first user request."""
-        encoded = self.tokenizer(
-            "không độc hại",
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors="pt",
-        ).to(self.device)
-        with torch.inference_mode():
-            self.model(**encoded)
+    @property
+    def preprocessing_description(self) -> str:
+        """Mô tả pipeline cho endpoint /metadata."""
+        if self._slow_tokenizer:
+            return "Underthesea word segmentation + teencode normalization"
+        return "Raw text + teencode normalization (no word segmentation)"
+
+    def _prepare_input(self, text: str) -> str:
+        """Trả về string chính xác sẽ được đưa vào tokenizer.
+
+        PhoBERT train trên text đã word-segment (compound words nối bằng
+        '_'); ViSoBERT/XLM-R train trên raw text. Cả hai đều qua cùng
+        bước cleanup nhẹ để behavior user thấy được nhất quán.
+        """
+        if self._slow_tokenizer:
+            return self.preprocessor.clean_text(text)
+        return self.preprocessor.normalize_teencode(
+            self.preprocessor.remove_repeated_chars(self.preprocessor.text_key(text))
+        )
 
     def predict(self, text: str) -> dict:
-        """Preprocess text, run inference, and return JSON-serializable values."""
         started_at = perf_counter()
-        text_cleaned = self.preprocessor.clean_text(text)
+        text_input = self._prepare_input(text)
+
         encoded = self.tokenizer(
-            text_cleaned,
+            text_input,
             truncation=True,
             padding=True,
             max_length=self.max_length,
@@ -64,69 +92,78 @@ class HSDInferenceService:
         ).to(self.device)
 
         with torch.inference_mode():
-            outputs = self.model(**encoded)
-            probabilities = torch.softmax(outputs.logits, dim=-1)[0]
+            probabilities = torch.softmax(self.model(**encoded).logits, dim=-1)[0]
 
-        probability_values = [float(value) for value in probabilities.cpu().tolist()]
+        probability_values = [float(v) for v in probabilities.cpu().tolist()]
         predicted_id = int(probabilities.argmax())
 
         return {
             "text": text,
-            "text_cleaned": text_cleaned,
+            "text_cleaned": text_input,
             "label": LABELS[predicted_id],
+            "predicted_id": predicted_id,
             "confidence": probability_values[predicted_id],
             "probabilities": dict(zip(LABELS, probability_values, strict=True)),
             "latency_ms": round((perf_counter() - started_at) * 1000, 2),
-            "token_importance": [],
         }
 
-    def _token_importance(self, text_cleaned: str, encoded, attentions) -> list[dict]:
-        """Approximate per-word importance from the model's own attention.
+    def predict_batch(self, texts: list[str]) -> list[dict]:
+        """Batched forward pass -- 1 pass cho cả batch.
 
-        Method: last transformer layer, attention heads averaged, taking the
-        row for the CLS/BOS position (index 0) -- i.e. "how much did each
-        subword contribute to the representation the classifier head reads."
-        This is a heuristic, not a formally validated attribution method
-        (unlike LIME/Integrated Gradients); report it as "attention-based
-        visualization," not as a rigorous explainability claim.
-
-        `use_fast=False` means there's no automatic subword->word offset
-        map, so word boundaries are recovered by re-tokenizing each
-        whitespace-split word on its own and counting pieces. Because the
-        input is already word-segmented (compound words joined by "_"),
-        PhoBERT's BPE vocabulary is built to respect those boundaries, so
-        this recovers the true split in the large majority of cases -- but
-        it is still an approximation, not a guaranteed exact alignment.
+        Nhanh hơn ~20-50x so với gọi predict() trong vòng lặp cho batch 100
+        vì tận dụng được GPU parallelism.
         """
-        words = text_cleaned.split()
-        if not words or not attentions:
+        if not texts:
             return []
 
-        # attentions: tuple of (num_layers) tensors, each [batch, heads, seq, seq]
-        last_layer_attention = attentions[-1][0]              # -> [heads, seq, seq]
-        cls_attention = last_layer_attention.mean(dim=0)[0]   # avg heads -> [seq]; row 0 = CLS/BOS
+        started_at = perf_counter()
+        cleaned = [self._prepare_input(t) for t in texts]
 
-        total_tokens = encoded["input_ids"][0].shape[0]
-        piece_counts = [max(len(self.tokenizer.tokenize(word)), 1) for word in words]
+        encoded = self.tokenizer(
+            cleaned,
+            truncation=True,
+            padding=True,
+            max_length=self.max_length,
+            return_tensors="pt",
+        ).to(self.device)
 
-        cursor = 1  # skip the leading BOS/CLS special token
-        last_valid_index = total_tokens - 1  # reserve the final slot for EOS
-        scores: list[float] = []
+        with torch.inference_mode():
+            probs = torch.softmax(self.model(**encoded).logits, dim=-1).cpu()
 
-        for count in piece_counts:
-            if cursor >= last_valid_index:
-                scores.append(0.0)  # word fell outside max_length after truncation
-                continue
-            end = min(cursor + count, last_valid_index)
-            span = cls_attention[cursor:end]
-            scores.append(float(span.sum()) if span.numel() else 0.0)
-            cursor = end
+        per_item_ms = round((perf_counter() - started_at) * 1000 / len(texts), 2)
 
-        return [{"token": word, "score": score} for word, score in zip(words, scores)]
+        results: list[dict] = []
+        for i, text in enumerate(texts):
+            p = probs[i].tolist()
+            pid = int(probs[i].argmax())
+            results.append({
+                "text": text,
+                "text_cleaned": cleaned[i],
+                "label": LABELS[pid],
+                "predicted_id": pid,
+                "confidence": p[pid],
+                "probabilities": dict(zip(LABELS, p, strict=True)),
+                "latency_ms": per_item_ms,
+                "token_importance": [],
+            })
+        return results
+
+    def warm_up(self) -> None:
+        """1 dummy forward pass để CUDA context + kernel cache nóng trước
+        khi request thật đầu tiên đập vào endpoint."""
+        encoded = self.tokenizer(
+            _WARMUP_TEXT,
+            truncation=True,
+            max_length=self.max_length,
+            return_tensors="pt",
+        ).to(self.device)
+        with torch.inference_mode():
+            self.model(**encoded)
 
     def _predict_proba_for_shap(self, masked_texts) -> np.ndarray:
+        """Callable cho shap.Explainer -- phải trả [n_samples, n_classes]."""
         encoded = self.tokenizer(
-            list(masked_texts),
+            [str(t) for t in masked_texts],
             truncation=True,
             padding=True,
             max_length=self.max_length,
@@ -136,28 +173,11 @@ class HSDInferenceService:
             logits = self.model(**encoded).logits
         return torch.softmax(logits, dim=-1).cpu().numpy()
 
-    def explain_with_shap(
-        self,
-        text: str,
-        max_evals: int = 80,
-        predicted_id: int | None = None,
-    ) -> list[dict]:
-        import logging
-
-        import shap
-
-        logger = logging.getLogger(__name__)
-
-        text_cleaned = self.preprocessor.clean_text(text)
-        if not text_cleaned.strip():
-            return []
-
-        cache_key = (text_cleaned, max_evals, predicted_id if predicted_id is not None else -1)
-        cached_scores = self._shap_cache.get(cache_key)
-        if cached_scores is not None:
-            return cached_scores
-
+    def _get_shap_explainer(self):
+        """Build explainer 1 lần / service instance."""
         if self._shap_explainer is None:
+            import shap
+
             masker = shap.maskers.Text(tokenizer=r"\s+")
             self._shap_explainer = shap.Explainer(
                 self._predict_proba_for_shap,
@@ -166,23 +186,66 @@ class HSDInferenceService:
                 output_names=LABELS,
                 seed=7,
             )
+        return self._shap_explainer
+
+    def _cache_get(self, key: tuple) -> list[dict] | None:
+        """LRU lookup -- an toàn với multi-thread FastAPI."""
+        with self._cache_lock:
+            if key in self._shap_cache:
+                self._shap_cache.move_to_end(key)
+                return self._shap_cache[key]
+        return None
+
+    def _cache_put(self, key: tuple, value: list[dict]) -> None:
+        with self._cache_lock:
+            self._shap_cache[key] = value
+            self._shap_cache.move_to_end(key)
+            while len(self._shap_cache) > _SHAP_CACHE_SIZE:
+                self._shap_cache.popitem(last=False)
+
+    def explain_with_shap(
+        self,
+        text: str,
+        max_evals: int = 80,
+        predicted_id: int | None = None,
+    ) -> list[dict]:
+        """Trả về SHAP score theo token cho class đã chỉ định.
+
+        Preprocessing ủy thác cho `_prepare_input`, nên explanation luôn
+        giải thích CÙNG input mà predict() sẽ dùng.
+        """
+        import shap  # noqa: F401 -- validate dependency sớm
+
+        text_cleaned = self._prepare_input(text)
+        if not text_cleaned.strip():
+            return []
+
+        cache_key = (
+            text_cleaned,
+            max_evals,
+            predicted_id if predicted_id is not None else -1,
+        )
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+        explainer = self._get_shap_explainer()
 
         try:
-            shap_values = self._shap_explainer([text_cleaned], max_evals=max_evals)
+            shap_values = explainer([text_cleaned], max_evals=max_evals)
         except Exception as exc:
             logger.exception("SHAP explainer failed.")
             raise RuntimeError(f"SHAP explainer failed: {exc}") from exc
 
         if predicted_id is None:
             predicted_id = int(np.argmax(self._predict_proba_for_shap([text_cleaned])[0]))
-        sv = shap_values[0, :, predicted_id]
 
+        sv = shap_values[0, :, predicted_id]
         token_scores = [
             {"token": str(token).strip(), "score": float(score)}
             for token, score in zip(sv.data, sv.values)
             if str(token).strip()
         ]
-        self._shap_cache[cache_key] = token_scores
-        if len(self._shap_cache) > 32:
-            self._shap_cache.pop(next(iter(self._shap_cache)))
+
+        self._cache_put(cache_key, token_scores)
         return token_scores

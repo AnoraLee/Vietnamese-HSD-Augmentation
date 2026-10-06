@@ -1,87 +1,119 @@
 project:
-  name: vietnamese-hsd-augmentation
+  name: Vietnamese_HSD_Augmentation
   seed: 42
-  label_names:
-    - CLEAN
-    - OFFENSIVE
-    - HATE
+  label_names: [CLEAN, OFFENSIVE, HATE]
 
 paths:
-  raw_dir: data/raw
-  processed_dir: data/processed
-  augmented_dir: data/augmented
-  metrics_dir: results/metrics
-  figures_dir: results/figures
-  error_analysis_dir: results/error_analysis
-  models_dir: models
+  data_dir:            data
+  raw_dir:             data/raw
+  processed_dir:       data/processed
+  augmented_dir:       data/augmented
+  models_dir:          models
+  results_dir:         results
+  figures_dir:         results/figures
+  metrics_dir:         results/metrics
+  error_analysis_dir:  results/error_analysis
+  log_dir:             results/logs
 
 data:
-  train_file: data/processed/train.csv
-  dev_file: data/processed/dev.csv
-  test_file: data/processed/test.csv
+  train_file: data/processed/tdtu_train.csv
+  dev_file:   data/processed/tdtu_dev.csv
+  test_file:  data/processed/tdtu_test.csv
   text_column: text
   label_column: label
-  private_vlsp_file: null
 
 preprocessing:
   engine: underthesea
   teencode_normalization: true
 
 huggingface:
-  dataset_repo_id: BonTori/tdtu_vietnamese_hsd_final
-  model_repo_prefix: BonTori/vietnamese-hsd
-  private: true
-  baseline_config: default
+  dataset_repo_id: AnoraLee/tdtu_vietnamese_hsd_final
+  default_dataset_config: baseline_segmented
   split_names:
     train: tdtu_train
-    dev: tdtu_dev
-    test: tdtu_test
-  revision: null
+    dev:   tdtu_dev
+    test:  tdtu_test
+  results_repo_id: AnoraLee/tdtu_vietnamese_hsd_results
+  model_repo_prefix: AnoraLee/tdtu_vietnamese_hsd
+  private: true
+  token_env: HF_TOKEN
+  slow_tokenizer_models: [phobert]
+  default_experiment: phobert_combined
+  models:
+    phobert_baseline:  BonTori/phobert-baseline-retrain-hsd
+    phobert_bt:        AnoraLee/vietnamese-hsd-phobert-bt
+    phobert_eda:       BonTori/phobert-eda-retrain-hsd
+    phobert_llm:       BonTori/phobert-llm-segmented-hsd
+    phobert_combined:  AnoraLee/vietnamese-hsd-phobert-combined
+    visobert_baseline: AnoraLee/vietnamese-hsd-visobert-baseline
+    visobert_combined: AnoraLee/vietnamese-hsd-visobert-combined
+
+  experiment_order:
+    - phobert_baseline
+    - phobert_bt
+    - phobert_eda
+    - phobert_llm
+    - phobert_combined
+    - visobert_baseline
+    - visobert_combined
 
 augmentation:
-  samples_per_label:
-    CLEAN: 0
-    OFFENSIVE: 500
-    HATE: 500
+  seed: 42
   back_translation:
-    intermediate_language: en
+    enabled: true
     source_language: vi
-    max_samples: 1000
+    intermediate_language: en
+    samples_per_label: { OFFENSIVE: 500, HATE: 500 }
     output_file: data/augmented/aug_bt.csv
   eda:
-    operations:
-      - random_swap
-      - random_deletion
-      - random_insertion
+    enabled: true
+    operations: [random_swap, random_deletion, random_insertion]
     alpha: 0.1
     num_aug: 1
+    samples_per_label: { OFFENSIVE: 500, HATE: 500 }
     output_file: data/augmented/aug_eda.csv
   llm:
+    enabled: true
     max_samples: 300
-    prompt_template: "Rewrite the Vietnamese sentence while preserving the same hate-speech label. Label: {label}. Sentence: {text}"
+    prompt_template: >-
+      Rewrite the Vietnamese sentence while preserving the same hate-speech
+      label. Label: {label_name}. Sentence: {text}
     output_files:
       gemma: data/augmented/aug_gemma.csv
-      qwen: data/augmented/aug_qwen.csv
+      qwen:  data/augmented/aug_qwen.csv
     prompt_log_file: data/augmented/llm_prompts.jsonl
 
 training:
   model_name: vinai/phobert-base
   max_length: 128
   batch_size: 16
-  learning_rate: 0.00002
+  learning_rate: 2.0e-5
   epochs: 3
   weight_decay: 0.01
   warmup_ratio: 0.06
-  evaluation_strategy: epoch
+  fp16: true
+  bf16: false
+  gradient_accumulation_steps: 1
+  dataloader_num_workers: 2
+  eval_strategy: epoch
   save_strategy: epoch
+  save_total_limit: 2 
   load_best_model_at_end: true
   metric_for_best_model: macro_f1
   output_dir_template: "models/{experiment}_phobert"
+  push_to_hub: true
 
 experiments:
   required:
-    - baseline
-    - bt
-    - eda
-    - llm
-    - combined
+    - phobert_baseline
+    - phobert_bt
+    - phobert_eda
+    - phobert_llm
+    - phobert_combined
+  augmentation_map:
+    phobert_baseline: []
+    phobert_bt:       [data/augmented/aug_bt.csv]
+    phobert_eda:      [data/augmented/aug_eda.csv]
+    phobert_llm:      [data/augmented/aug_gemma.csv, data/augmented/aug_qwen.csv]
+    phobert_combined: [data/augmented/aug_bt.csv, data/augmented/aug_eda.csv,
+                       data/augmented/aug_gemma.csv, data/augmented/aug_qwen.csv]

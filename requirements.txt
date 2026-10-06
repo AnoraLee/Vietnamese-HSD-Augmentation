@@ -1,11 +1,29 @@
+# Web framework
 fastapi
 uvicorn[standard]
-pydantic
+pydantic>=2
+python-dotenv
 
---extra-index-url https://download.pytorch.org/whl/cu128
-torch==2.11.0+cu128
+# ML core
+torch
 transformers
-underthesea
-
-PyYAML
 shap
+
+# Vietnamese NLP
+underthesea
+sacremoses
+sentencepiece
+pyyaml
+
+# HF Hub & datasets
+huggingface_hub
+datasets
+
+# Data & eval
+numpy
+pandas
+scikit-learn
+
+# Utils
+requests
+tqdm

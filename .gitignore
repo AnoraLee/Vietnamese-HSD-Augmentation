@@ -10,26 +10,37 @@ ENV/
 __pycache__/
 *.so
 *.egg-info/
+build/
+dist/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 *.csv
+!results/error_analysis/*.csv
+!results/metrics/*.csv
+
 *.parquet
 *.pt
 *.bin
 *.safetensors
+
 data/raw/*
 data/processed/*
 data/augmented/*
 
 models/*
 !models/.gitkeep
-vncorenlp/
-assets/vncorenlp/
 
-results/metrics/*
-results/error_analysis/*
 results/figures/*.png
 results/figures/*.pdf
 !results/**/.gitkeep
+
+results/logs/*
+!results/logs/.gitkeep
 
 .vscode/
 .idea/
@@ -48,6 +59,12 @@ Thumbs.db
 
 *.cache
 .cache/
+.cache/huggingface/
 
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local

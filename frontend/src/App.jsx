@@ -10,11 +10,13 @@ const EXAMPLES = [
 ];
 
 const MODEL_OPTIONS = [
-  { value: "baseline", label: "Baseline", shortLabel: "Base" },
-  { value: "bt", label: "Back-Translation", shortLabel: "BT" },
-  { value: "eda", label: "EDA", shortLabel: "EDA" },
-  { value: "llm", label: "LLM-Gen", shortLabel: "LLM" },
-  { value: "combined", label: "Combined (Tốt nhất)", shortLabel: "Combined" },
+  { value: "phobert_baseline",  label: "PhoBERT Baseline",       shortLabel: "P-Base" },
+  { value: "phobert_bt",        label: "PhoBERT Back-Translation", shortLabel: "P-BT" },
+  { value: "phobert_eda",       label: "PhoBERT EDA",             shortLabel: "P-EDA" },
+  { value: "phobert_llm",       label: "PhoBERT LLM-Gen",         shortLabel: "P-LLM" },
+  { value: "phobert_combined",  label: "PhoBERT Combined",        shortLabel: "P-Comb" },
+  { value: "visobert_baseline", label: "ViSoBERT Baseline",       shortLabel: "V-Base" },
+  { value: "visobert_combined", label: "ViSoBERT Combined",       shortLabel: "V-Comb" },
 ];
 
 const TOOL_OPTIONS = [
@@ -49,21 +51,19 @@ const TOOL_OPTIONS = [
 ];
 
 const MODEL_CATALOG = [
-  { value: "baseline", name: "Baseline PhoBERT", short: "BASE", path: "models/baseline_phobert", accent: "blue", note: "Mô hình đối chứng không tăng cường dữ liệu." },
-  { value: "bt", name: "Back-Translation", short: "BT", path: "models/bt_phobert", accent: "violet", note: "Tăng cường bằng dịch ngược để mở rộng biến thể câu." },
-  { value: "eda", name: "EDA PhoBERT", short: "EDA", path: "models/eda_phobert", accent: "amber", note: "Tăng cường dữ liệu bằng thao tác EDA." },
-  { value: "llm", name: "LLM-Gen PhoBERT", short: "LLM", path: "models/llm_phobert", accent: "pink", note: "Dữ liệu tổng hợp được tạo bởi mô hình ngôn ngữ." },
-  { value: "combined", name: "Combined PhoBERT", short: "BEST", path: "models/combined_phobert", accent: "green", note: "Kết hợp các nguồn tăng cường cho bài toán cuối." },
+  { value: "phobert_baseline",  name: "PhoBERT Baseline",  short: "P-BASE", path: "models/phobert_baseline_phobert",  accent: "blue",   note: "..." },
+  { value: "phobert_bt",        name: "PhoBERT BT",         short: "P-BT",   path: "models/phobert_bt_phobert",        accent: "violet", note: "..." },
+  { value: "phobert_eda",       name: "PhoBERT EDA",        short: "P-EDA",  path: "models/phobert_eda_phobert",       accent: "amber",  note: "..." },
+  { value: "phobert_llm",       name: "PhoBERT LLM",        short: "P-LLM",  path: "models/phobert_llm_phobert",       accent: "pink",   note: "..." },
+  { value: "phobert_combined",  name: "PhoBERT Combined",   short: "P-COMB", path: "models/phobert_combined_phobert",  accent: "green",  note: "..." },
+  { value: "visobert_baseline", name: "ViSoBERT Baseline",  short: "V-BASE", path: "models/visobert_baseline_phobert", accent: "cyan",   note: "..." },
+  { value: "visobert_combined", name: "ViSoBERT Combined",  short: "V-COMB", path: "models/visobert_combined_phobert", accent: "teal",   note: "..." },
 ];
 
-const EVALUATION_METRICS = [
-  { experiment: "baseline", loss: 0.4356456399, accuracy: 0.8441301703, macroF1: 0.6022121449, weightedF1: 0.8474638518, hateF1: 0.5375 },
-  { experiment: "bt", loss: 0.5105280280, accuracy: 0.8325729927, macroF1: 0.6063153778, weightedF1: 0.8436205453, hateF1: 0.5718954248 },
-  { experiment: "eda", loss: 0.5662659407, accuracy: 0.7843673966, macroF1: 0.5827606501, weightedF1: 0.8132514297, hateF1: 0.56 },
-  { experiment: "llm", loss: 0.4985623360, accuracy: 0.8347019465, macroF1: 0.6092694843, weightedF1: 0.8449483439, hateF1: 0.5609958506 },
-  { experiment: "combined", loss: 0.5487710834, accuracy: 0.8007907543, macroF1: 0.5948152258, weightedF1: 0.8232510784, hateF1: 0.5902061856 },
-];
+const DEFAULT_MODEL = "phobert_combined";
 
+// Error analysis -- vẫn hardcode vì backend chưa có endpoint cho phần này.
+// TODO: chuyển sang /evaluation/errors?model=<exp> khi có file confusion_summary.
 const COMBINED_ERRORS = [
   { from: "CLEAN", to: "OFFENSIVE", count: 946, tone: "offensive" },
   { from: "CLEAN", to: "HATE", count: 287, tone: "hate" },
@@ -105,17 +105,26 @@ function tokenizeSegmented(text, importance) {
     ? Math.max(...positiveScores, 0.0001)
     : 0;
 
-  return text.split(/\s+/).filter(Boolean).map((token, index) => ({
-    key: `${token}-${index}`,
-    syllables: token.split("_"),
-    compound: token.includes("_"),
-    importance: maxPositive ? positiveScores[index] / maxPositive : 0,
-    rawScore: scores[index] ?? 0,
-  }));
+  return text.split(/\s+/).filter(Boolean).map((token, index) => {
+    const raw = scores[index];
+    const positive = positiveScores[index];
+    const importanceValue =
+      maxPositive && Number.isFinite(positive) && positive != null
+        ? positive / maxPositive
+        : 0;
+    return {
+      key: `${token}-${index}`,
+      syllables: token.split("_"),
+      compound: token.includes("_"),
+      importance: Number.isFinite(importanceValue) ? importanceValue : 0,
+      rawScore: Number.isFinite(raw) ? raw : 0,
+    };
+  });
 }
 
 function formatPercent(value) {
-  return new Intl.NumberFormat("vi-VN", { style: "percent", maximumFractionDigits: 2 }).format(value);
+  const safe = Number.isFinite(value) ? value : 0;
+  return new Intl.NumberFormat("vi-VN", { style: "percent", maximumFractionDigits: 2 }).format(safe);
 }
 
 function formatHistoryDate(value) {
@@ -125,6 +134,11 @@ function formatHistoryDate(value) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+// CSS class-safe: "phobert_baseline" -> "phobert-baseline"
+function cssKey(experiment) {
+  return String(experiment ?? "").replace(/_/g, "-");
 }
 
 function HsdLogo() {
@@ -202,11 +216,40 @@ function ModelWorkspace({ activeModel, onSelectModel }) {
   );
 }
 
-function EvaluationWorkspace({ activeModel }) {
-  const bestMacro = EVALUATION_METRICS.reduce((best, item) => item.macroF1 > best.macroF1 ? item : best);
-  const bestHate = EVALUATION_METRICS.reduce((best, item) => item.hateF1 > best.hateF1 ? item : best);
-  const selected = EVALUATION_METRICS.find((item) => item.experiment === activeModel) ?? EVALUATION_METRICS[0];
+function EvaluationWorkspace({ activeModel, metrics = [] }) {
   const largestError = COMBINED_ERRORS[0];
+
+  if (!metrics.length) {
+    return (
+      <div className="workspace-view workspace-view--evaluation">
+        <div className="workspace-heading">
+          <div>
+            <span className="workspace-kicker">EVALUATION LAB / TEST SET</span>
+            <h1>Đánh giá kết quả</h1>
+            <p>
+              Chưa đọc được metrics. Chạy evaluation script và đặt file{" "}
+              <code>results/metrics/metrics_&lt;experiment&gt;.json</code>.
+            </p>
+          </div>
+        </div>
+        <div className="tool-empty-note">
+          Backend trả về 404 hoặc mảng rỗng từ <code>/evaluation/metrics</code>.
+        </div>
+      </div>
+    );
+  }
+
+  const bestMacro = metrics.reduce(
+    (best, item) => ((item.macroF1 ?? 0) > (best.macroF1 ?? 0) ? item : best),
+    metrics[0],
+  );
+  const bestHate = metrics.reduce(
+    (best, item) => ((item.hateF1 ?? 0) > (best.hateF1 ?? 0) ? item : best),
+    metrics[0],
+  );
+  const selected =
+    metrics.find((item) => item.experiment === activeModel) ?? metrics[0];
+
   return (
     <div className="workspace-view workspace-view--evaluation">
       <div className="workspace-heading">
@@ -217,36 +260,90 @@ function EvaluationWorkspace({ activeModel }) {
         </div>
         <div className="evaluation-stamp">LIVE<br /><b>RESULTS</b></div>
       </div>
-      <div className={`metric-spotlight metric-spotlight--${selected.experiment}`}>
-        <div><span>MODEL ĐANG CHỌN</span><strong>{selected.experiment.toUpperCase()}</strong><small>kết quả theo model đang dùng</small></div>
-        <div><span>ACCURACY</span><strong>{formatPercent(selected.accuracy)}</strong><small>test set</small></div>
-        <div><span>MACRO-F1 TỐT NHẤT</span><strong>{formatPercent(bestMacro.macroF1)}</strong><small>{bestMacro.experiment.toUpperCase()}</small></div>
-        <div><span>HATE-F1 TỐT NHẤT</span><strong>{formatPercent(bestHate.hateF1)}</strong><small>{bestHate.experiment.toUpperCase()}</small></div>
-      </div>
-      <div className="evaluation-table-wrap">
-        <div className="table-caption"><span>EXPERIMENT SUMMARY</span><span>5 RUNS · SORTED BY ACCURACY</span></div>
-        <div className="evaluation-table" role="table">
-          <div className="evaluation-row evaluation-row--head" role="row"><span>EXPERIMENT</span><span>ACCURACY</span><span>MACRO-F1</span><span>WEIGHTED-F1</span><span>HATE-F1</span></div>
-          {[...EVALUATION_METRICS].sort((a, b) => b.accuracy - a.accuracy).map((item) => (
-            <div className={`evaluation-row evaluation-row--${item.experiment}${item.experiment === selected.experiment ? " evaluation-row--active" : ""}`} key={item.experiment} role="row">
-              <span>{item.experiment}</span>
-              <span>{formatPercent(item.accuracy)}</span><span>{formatPercent(item.macroF1)}</span><span>{formatPercent(item.weightedF1)}</span><span>{formatPercent(item.hateF1)}</span>
-            </div>
-          ))}
+
+      <div className={`metric-spotlight metric-spotlight--${cssKey(selected.experiment)}`}>
+        <div>
+          <span>MODEL ĐANG CHỌN</span>
+          <strong>{selected.experiment.toUpperCase()}</strong>
+          <small>kết quả theo model đang dùng</small>
+        </div>
+        <div>
+          <span>ACCURACY</span>
+          <strong>{formatPercent(selected.accuracy)}</strong>
+          <small>test set</small>
+        </div>
+        <div>
+          <span>MACRO-F1 TỐT NHẤT</span>
+          <strong>{formatPercent(bestMacro.macroF1)}</strong>
+          <small>{bestMacro.experiment.toUpperCase()}</small>
+        </div>
+        <div>
+          <span>HATE-F1 TỐT NHẤT</span>
+          <strong>{formatPercent(bestHate.hateF1)}</strong>
+          <small>{bestHate.experiment.toUpperCase()}</small>
         </div>
       </div>
+
+      <div className="evaluation-table-wrap">
+        <div className="table-caption">
+          <span>EXPERIMENT SUMMARY</span>
+          <span>{metrics.length} RUNS · SORTED BY ACCURACY</span>
+        </div>
+        <div className="evaluation-table" role="table">
+          <div className="evaluation-row evaluation-row--head" role="row">
+            <span>EXPERIMENT</span>
+            <span>ACCURACY</span>
+            <span>MACRO-F1</span>
+            <span>WEIGHTED-F1</span>
+            <span>HATE-F1</span>
+          </div>
+          {[...metrics]
+            .sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0))
+            .map((item) => (
+              <div
+                className={`evaluation-row evaluation-row--${cssKey(item.experiment)}${item.experiment === selected.experiment ? " evaluation-row--active" : ""}`}
+                key={item.experiment}
+                role="row"
+              >
+                <span>{item.experiment}</span>
+                <span>{formatPercent(item.accuracy)}</span>
+                <span>{formatPercent(item.macroF1)}</span>
+                <span>{formatPercent(item.weightedF1)}</span>
+                <span>{formatPercent(item.hateF1)}</span>
+              </div>
+            ))}
+        </div>
+      </div>
+
       <section className="error-analysis-panel">
         <div className="error-analysis-heading">
-          <div><span className="workspace-kicker">ERROR ANALYSIS / COMBINED</span><h2>Những lỗi mô hình hay gặp</h2></div>
+          <div>
+            <span className="workspace-kicker">ERROR ANALYSIS / {selected.experiment.toUpperCase()}</span>
+            <h2>Những lỗi mô hình hay gặp</h2>
+          </div>
           <span className="error-analysis-source">confusion_summary.csv</span>
         </div>
         <div className="error-analysis-layout">
-          <div className="error-callout"><span className="error-summary-icon">!</span><div><strong>Lỗi nổi bật nhất</strong><p><b>{largestError.from}</b> bị dự đoán thành <b>{largestError.to}</b> trong <em>{largestError.count.toLocaleString("vi-VN")}</em> trường hợp.</p></div></div>
+          <div className="error-callout">
+            <span className="error-summary-icon">!</span>
+            <div>
+              <strong>Lỗi nổi bật nhất</strong>
+              <p>
+                <b>{largestError.from}</b> bị dự đoán thành <b>{largestError.to}</b>{" "}
+                trong <em>{largestError.count.toLocaleString("vi-VN")}</em> trường hợp.
+              </p>
+            </div>
+          </div>
           <div className="error-bars">
             {COMBINED_ERRORS.map((error) => (
               <div className="error-bar-row" key={`${error.from}-${error.to}`}>
                 <span className="error-bar-label">{error.from} <i>→</i> {error.to}</span>
-                <span className="error-bar-track"><span className={`error-bar-fill error-bar-fill--${error.tone}`} style={{ width: `${(error.count / largestError.count) * 100}%` }} /></span>
+                <span className="error-bar-track">
+                  <span
+                    className={`error-bar-fill error-bar-fill--${error.tone}`}
+                    style={{ width: `${(error.count / largestError.count) * 100}%` }}
+                  />
+                </span>
                 <strong>{error.count.toLocaleString("vi-VN")}</strong>
               </div>
             ))}
@@ -291,7 +388,6 @@ function AiMessage({ message, metadata, onExplain }) {
       <div className="chat-avatar ai-avatar" aria-label="HSD Agent"><HsdLogo /></div>
 
       <div className="chat-content">
-        {/* -------- Tầng 1: Verdict -------- */}
         <div className={`verdict verdict--${verdict.className}`}>
           <div className="verdict-head">
             <span className="verdict-eyebrow">Kết quả phân loại</span>
@@ -324,7 +420,6 @@ function AiMessage({ message, metadata, onExplain }) {
           </dl>
         </div>
 
-        {/* -------- Tầng 2: Annotated text -------- */}
         <div className="reading-text">
           <p className="annotated">
             {tokens.map((token) => {
@@ -358,12 +453,11 @@ function AiMessage({ message, metadata, onExplain }) {
           </p>
         </div>
 
-        {/* -------- Tầng 3: XAI disclosure -------- */}
         <div className={`xai-panel${xaiOpen ? " xai-panel--open" : ""}`}>
           <button
             type="button"
             className="xai-toggle"
-            onClick={() => onExplain(message.id, result.text_cleaned, result.model_used)}
+            onClick={() => onExplain(message.id, result.text, result.model_used)}
             disabled={isExplaining}
             aria-expanded={xaiOpen}
           >
@@ -403,11 +497,11 @@ function AiMessage({ message, metadata, onExplain }) {
               </div>
 
               <ul className="xai-chart">
-                {features.map((f) => {
+                {features.map((f, i) => {
                   const pct = (Math.abs(f.score) / maxAbs) * 50;
                   const positive = f.score >= 0;
                   return (
-                    <li key={f.token} className="xai-row">
+                    <li key={`${f.token}-${i}`} className="xai-row">
                       <span className="xai-word" title={f.token}>{f.token}</span>
                       <span className="xai-track">
                         <span className="xai-axis" aria-hidden="true" />
@@ -432,7 +526,6 @@ function AiMessage({ message, metadata, onExplain }) {
           )}
         </div>
 
-        {/* -------- Footer hành động -------- */}
         <div className="bubble-actions">
           <button type="button" className="ghost-btn" onClick={handleCopy}>
             {copied ? "✓ Đã copy" : "Copy văn bản"}
@@ -450,9 +543,10 @@ export default function App() {
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState([]);
   const [metadata, setMetadata] = useState(null);
+  const [evaluationMetrics, setEvaluationMetrics] = useState([]);
   const [status, setStatus] = useState("checking");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [model, setModel] = useState("combined");
+  const [model, setModel] = useState(DEFAULT_MODEL);
   const [activeTool, setActiveTool] = useState("classifier");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [analysisHistory, setAnalysisHistory] = useState(readStoredHistory);
@@ -496,6 +590,17 @@ export default function App() {
         if (!response.ok) throw new Error("Lỗi kết nối");
         setMetadata(payload);
         setStatus("online");
+
+        // Metrics là optional -- không block trạng thái online.
+        try {
+          const metricsRes = await fetch(`${API_BASE_URL}/evaluation/metrics`);
+          if (metricsRes.ok) {
+            const metrics = await metricsRes.json();
+            setEvaluationMetrics(Array.isArray(metrics) ? metrics : []);
+          }
+        } catch {
+          // Bỏ qua -- EvaluationWorkspace sẽ hiện empty state.
+        }
       } catch {
         setStatus("offline");
       }
@@ -709,7 +814,7 @@ export default function App() {
         <main className="chat-messages">
           {activeTool !== "classifier" || messages.length === 0 ? (
             activeTool === "models" ? <ModelWorkspace activeModel={model} onSelectModel={setModel} />
-            : activeTool === "evaluation" ? <EvaluationWorkspace activeModel={model} />
+            : activeTool === "evaluation" ? <EvaluationWorkspace activeModel={model} metrics={evaluationMetrics} />
             : <div className={`empty-chat-greeting${activeTool !== "classifier" ? " tool-view" : ""}`}>
               <span className="tool-view-kicker">HSD / {activeTool.toUpperCase()}</span>
               <h1>{selectedTool.title}</h1>
@@ -863,7 +968,7 @@ export default function App() {
           <p className="footer-disclaimer">Kết quả chỉ mang tính tham khảo.</p>
         </footer> : (
           <footer className="chat-footer tool-footer">
-            <span>Chọn “Phân loại độc hại” để bắt đầu một phiên kiểm tra mới.</span>
+            <span>Chọn "Phân loại độc hại" để bắt đầu một phiên kiểm tra mới.</span>
           </footer>
         )}
       </div>

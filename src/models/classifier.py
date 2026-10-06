@@ -1,7 +1,9 @@
-"""Backward-compatible name for the shared inference service."""
+from __future__ import annotations
 
 from src.services.inference import HSDInferenceService
 
+__all__ = ["HSDClassifier"]
+
 
 class HSDClassifier(HSDInferenceService):
-    """Compatibility wrapper retained for the temporary Streamlit demo."""
+    pass

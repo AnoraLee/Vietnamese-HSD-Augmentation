@@ -436,3 +436,61 @@ button { outline: none; }
   .app-shell--empty .chat-footer { top: 42%; padding: 8px 15px 12px; transform: translate(-50%, 92px); }
   .app-shell--empty .input-container { min-height: 116px; }
 }
+
+.metric-spotlight--phobert-baseline,
+.evaluation-row--phobert-baseline { --evaluation-accent: #5dafff; }
+
+.metric-spotlight--phobert-bt,
+.evaluation-row--phobert-bt { --evaluation-accent: #b193ff; }
+
+.metric-spotlight--phobert-eda,
+.evaluation-row--phobert-eda { --evaluation-accent: #e7b65f; }
+
+.metric-spotlight--phobert-llm,
+.evaluation-row--phobert-llm { --evaluation-accent: #ed8cae; }
+
+.metric-spotlight--phobert-combined,
+.evaluation-row--phobert-combined { --evaluation-accent: #4ed0a2; }
+
+.metric-spotlight--visobert-baseline,
+.evaluation-row--visobert-baseline { --evaluation-accent: #55c6d8; }
+
+.metric-spotlight--visobert-combined,
+.evaluation-row--visobert-combined { --evaluation-accent: #3fbfa8; }
+
+.app-shell {
+  overflow: hidden;
+}
+
+/* 2. Cho phép flex item co lại nhỏ hơn content (min-height: 0 là mấu chốt) */
+.chat-layout {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 3. .chat-messages giờ co được → overflow-y: auto mới thực sự kích hoạt */
+.chat-messages {
+  min-height: 0;
+}
+
+/* 4. Scrollbar dễ thấy hơn (Firefox + Chrome/Edge 121+) */
+.chat-messages {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* Chrome/Edge cũ (< 121) dùng pseudo-element truyền thống */
+.chat-messages::-webkit-scrollbar {
+  width: 10px;
+}
+.chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-messages::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 2px solid var(--bg-main);
+  border-radius: 6px;
+}
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: var(--blue);
+}

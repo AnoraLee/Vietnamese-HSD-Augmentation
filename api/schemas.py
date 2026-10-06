@@ -1,12 +1,27 @@
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+Text = Annotated[str, StringConstraints(min_length=1, max_length=2000, strip_whitespace=True)]
+
+
+class ErrorDetail(BaseModel):
+    code: str
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    detail: ErrorDetail
 
 
 class PredictRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=2000, description="Vietnamese text to classify")
+    text: Text = Field(..., description="Vietnamese text to classify")
     model: str | None = Field(
         default=None,
-        description="Experiment key to run (baseline / bt / eda / llm / combined). "
-        "Falls back to the server's default MODEL_EXPERIMENT when omitted.",
+        description=(
+            "Experiment key to run. Falls back to the server's default "
+            "MODEL_EXPERIMENT when omitted. Use /metadata to see available keys."
+        ),
     )
 
 
@@ -18,17 +33,18 @@ class TokenImportance(BaseModel):
 class PredictResponse(BaseModel):
     text: str
     text_cleaned: str
-    label: str  # CLEAN / OFFENSIVE / HATE
+    label: str
+    predicted_id: int
     confidence: float
     probabilities: dict[str, float]
     latency_ms: float
     model_used: str
-    token_importance: list[TokenImportance] = Field(default_factory=list)
+    # token_importance đã xóa -- SHAP là endpoint riêng (/explain).
 
 
 class ExplainRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=2000)
-    model: str | None = Field(default=None, description="Same experiment keys as PredictRequest.")
+    text: Text
+    model: str | None = Field(default=None, description="Same keys as PredictRequest.")
     max_evals: int | None = Field(
         default=None,
         ge=20,
@@ -40,20 +56,25 @@ class ExplainRequest(BaseModel):
         ),
     )
 
+
 class ExplainResponse(BaseModel):
     label: str
     method: str = "shap"
+    model_used: str
     token_scores: list[TokenImportance]
     latency_ms: float
 
 
 class BatchPredictRequest(BaseModel):
-    texts: list[str] = Field(..., min_length=1, max_length=100)
+    model_config = ConfigDict(extra="forbid")
+    texts: list[Text] = Field(..., min_length=1, max_length=100)
     model: str | None = None
 
 
 class BatchPredictResponse(BaseModel):
     results: list[PredictResponse]
+    model_used: str
+    total_latency_ms: float
 
 
 class HealthResponse(BaseModel):
