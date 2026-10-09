@@ -24,11 +24,14 @@
   --hate-soft: #40201f;
   --mark-offensive: 230, 174, 87;
   --mark-hate: 239, 116, 108;
+  --sidebar-active-bg: #123768;
+  --sidebar-active-text: #fff;
+  --sidebar-icon: #d9e9ff;
   color-scheme: dark;
 }
 [data-theme="light"] {
   --bg-main: #f5f7fb;
-  --bg-sidebar: #101722;
+  --bg-sidebar: #ffffff;
   --bg-panel: #ffffff;
   --bg-elevated: #f0f4fa;
   --bg-hover: #e9f1fb;
@@ -48,6 +51,9 @@
   --hate-soft: #fce9e6;
   --mark-offensive: 173, 112, 29;
   --mark-hate: 198, 77, 73;
+  --sidebar-active-bg: #e4f0ff;
+  --sidebar-active-text: #0c5ebb;
+  --sidebar-icon: #42536b;
   color-scheme: light;
 }
 
@@ -154,9 +160,9 @@ button { outline: none; }
 .sidebar-section { display: flex; flex-direction: column; gap: 4px; }
 .sidebar-label { padding: 0 8px 4px; color: var(--muted); font: 700 .62rem "Geist", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .sidebar-tool { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 38px; padding: 0 9px; border: 0; border-radius: 5px; color: var(--muted-strong); background: transparent; font-size: .72rem; font-weight: 800; text-align: left; cursor: pointer; transition: color .16s, background .16s; }
-.sidebar-tool.active { color: #fff; background: #123768; }
+.sidebar-tool.active { color: var(--sidebar-active-text); background: var(--sidebar-active-bg); }
 .sidebar-tool:hover { color: var(--text); background: var(--bg-hover); }
-.sidebar-tool-icon { display: grid; place-items: center; width: 22px; height: 22px; flex: 0 0 22px; color: #d9e9ff; }
+.sidebar-tool-icon { display: grid; place-items: center; width: 22px; height: 22px; flex: 0 0 22px; color: var(--sidebar-icon); }
 .sidebar-tool-icon svg { width: 19px; height: 19px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .sidebar-spacer { flex: 1; }
 .sidebar-note { display: flex; align-items: center; gap: 8px; padding: 0 9px; color: var(--muted); font-size: .64rem; }
