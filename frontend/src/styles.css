@@ -26,6 +26,7 @@
   --sidebar-active-bg: #123768;
   --sidebar-active-text: #fff;
   --sidebar-icon: #d9e9ff;
+  --spotlight-tint: #12335a;
   color-scheme: dark;
 }
 [data-theme="light"] {
@@ -53,6 +54,7 @@
   --sidebar-active-bg: #e4f0ff;
   --sidebar-active-text: #0c5ebb;
   --sidebar-icon: #42536b;
+  --spotlight-tint: #d9e8fb;
   color-scheme: light;
 }
 
@@ -306,7 +308,6 @@ button { outline: none; }
 .send-button:not(:disabled):hover { background: var(--blue); filter: brightness(1.15); transform: translateY(-1px); }
 .send-button:disabled { opacity: .35; cursor: not-allowed; }
 .footer-disclaimer { margin: 8px 0 0; color: var(--muted); font: 12px "JetBrains Mono", monospace; text-align: center; }
-.tool-footer { justify-content: center; color: var(--muted); font: 12px "JetBrains Mono", monospace; text-align: center; }
 
 .workspace-view { width: min(100%, 1120px); margin: 0 auto; padding: 46px 12px 50px; animation: fadeIn .3s ease; }
 .workspace-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; margin-bottom: 31px; }
@@ -332,7 +333,7 @@ button { outline: none; }
 
 .metric-spotlight { display: grid; grid-template-columns: 1.25fr repeat(3, 1fr); gap: 1px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--line); }
 .metric-spotlight > div { min-height: 105px; padding: 16px; background: var(--bg-panel); }
-.metric-spotlight > div:first-child { background: linear-gradient(135deg, #12335a, var(--bg-panel)); }
+.metric-spotlight > div:first-child { background: linear-gradient(135deg, var(--spotlight-tint), var(--bg-panel)); }
 .metric-spotlight span { display: block; color: var(--muted); font: 500 12px "JetBrains Mono", monospace; letter-spacing: .08em; }
 .metric-spotlight strong { display: block; margin-top: 13px; color: var(--text); font: 700 22px "Be Vietnam Pro", sans-serif; }
 .metric-spotlight { --evaluation-accent: var(--blue); }
@@ -346,8 +347,15 @@ button { outline: none; }
 .evaluation-stamp { padding: 11px 13px; border: 1px solid var(--clean); border-radius: 4px; color: var(--clean); font: 12px/1.45 "JetBrains Mono", monospace; letter-spacing: .1em; text-align: center; }
 .evaluation-stamp b { font-size: 12px; }
 .evaluation-table-wrap { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--bg-panel); }
-.table-caption { display: flex; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); color: var(--muted); font: 12px "JetBrains Mono", monospace; letter-spacing: .08em; }
-.evaluation-row { display: grid; grid-template-columns: 1.35fr repeat(4, 1fr); align-items: center; min-height: 50px; padding: 0 16px; border-bottom: 1px solid var(--line); color: var(--muted-strong); font: 12px "JetBrains Mono", monospace; }
+.evaluation-table-scroll { --metric-count: 4; }
+.table-caption { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--line); color: var(--muted); font: 12px "JetBrains Mono", monospace; letter-spacing: .08em; }
+.column-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.column-filter em { font-style: normal; margin-right: 2px; color: var(--muted); font-size: 11px; letter-spacing: .08em; }
+.column-chip { padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: 20px; color: var(--muted); background: transparent; font: 500 11px "JetBrains Mono", monospace; letter-spacing: .05em; cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+.column-chip:hover:not(:disabled) { color: var(--text); border-color: var(--blue); }
+.column-chip[aria-pressed="true"] { color: var(--blue); border-color: var(--blue); background: var(--blue-soft); }
+.column-chip:disabled { cursor: not-allowed; opacity: .75; }
+.evaluation-row { display: grid; grid-template-columns: 1.35fr repeat(var(--metric-count, 4), 1fr); align-items: center; min-height: 50px; padding: 0 16px; border-bottom: 1px solid var(--line); color: var(--muted-strong); font: 12px "JetBrains Mono", monospace; }
 .evaluation-row:last-child { border-bottom: 0; }
 .evaluation-row--head { min-height: 37px; color: var(--muted); font-size: 12px; }
 .evaluation-row--active { color: var(--text); background: rgba(60, 155, 255, .08); }
@@ -358,7 +366,7 @@ button { outline: none; }
 .evaluation-row--combined { --evaluation-accent: #4ed0a2; }
 .evaluation-row:not(.evaluation-row--head) { border-left: 3px solid var(--evaluation-accent); }
 .evaluation-row:not(.evaluation-row--head) > span:first-child { color: var(--evaluation-accent); }
-.evaluation-row > span:not(:first-child) { text-align: right; }
+.evaluation-row > span:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
 .run-dot { display: inline-block; width: 6px; height: 6px; margin-right: 9px; border-radius: 50%; background: var(--muted); }
 .run-dot--baseline { background: #5dafff; } .run-dot--bt { background: #b193ff; } .run-dot--eda { background: #e7b65f; } .run-dot--llm { background: #ed8cae; } .run-dot--combined { background: #4ed0a2; }
 .error-analysis-panel { margin-top: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); }
@@ -408,9 +416,10 @@ button { outline: none; }
   .model-card { min-height: 160px; }
   .metric-spotlight { grid-template-columns: repeat(2, 1fr); }
   .metric-spotlight > div:first-child { grid-column: span 2; }
-  .evaluation-table-wrap { overflow-x: auto; }
-  .evaluation-table { min-width: 620px; }
-  .table-caption { min-width: 620px; }
+  /* Caption cuộn theo trang và cho chip xuống dòng; chỉ riêng bảng cuộn ngang,
+     bề rộng co theo số cột đang bật nên lọc bớt cột là hết tràn. */
+  .evaluation-table-scroll { overflow-x: auto; }
+  .evaluation-table { min-width: calc(190px + var(--metric-count, 4) * 100px); }
   .error-analysis-layout { grid-template-columns: 1fr; gap: 18px; }
   .error-analysis-heading { flex-direction: column; gap: 8px; }
 }
@@ -499,6 +508,26 @@ button { outline: none; }
 
 .metric-spotlight--visobert-combined,
 .evaluation-row--visobert-combined { --evaluation-accent: #3fbfa8; }
+
+/* Light mode: nhãn phụ trong ô "Model đang chọn" cần đậm hơn --muted mới đủ tương phản. */
+[data-theme="light"] .metric-spotlight > div:first-child span,
+[data-theme="light"] .metric-spotlight > div:first-child small { color: var(--muted-strong); }
+
+/* Light mode: accent đậm hơn để tên model đọc được trên nền sáng của ô "Model đang chọn". */
+[data-theme="light"] .metric-spotlight--phobert-baseline,
+[data-theme="light"] .evaluation-row--phobert-baseline { --evaluation-accent: #1a6fc4; }
+[data-theme="light"] .metric-spotlight--phobert-bt,
+[data-theme="light"] .evaluation-row--phobert-bt { --evaluation-accent: #6d3fc7; }
+[data-theme="light"] .metric-spotlight--phobert-eda,
+[data-theme="light"] .evaluation-row--phobert-eda { --evaluation-accent: #8a5e12; }
+[data-theme="light"] .metric-spotlight--phobert-llm,
+[data-theme="light"] .evaluation-row--phobert-llm { --evaluation-accent: #bb3c71; }
+[data-theme="light"] .metric-spotlight--phobert-combined,
+[data-theme="light"] .evaluation-row--phobert-combined { --evaluation-accent: #0b7f5e; }
+[data-theme="light"] .metric-spotlight--visobert-baseline,
+[data-theme="light"] .evaluation-row--visobert-baseline { --evaluation-accent: #10707f; }
+[data-theme="light"] .metric-spotlight--visobert-combined,
+[data-theme="light"] .evaluation-row--visobert-combined { --evaluation-accent: #0a7d6c; }
 
 .app-shell {
   overflow: hidden;
