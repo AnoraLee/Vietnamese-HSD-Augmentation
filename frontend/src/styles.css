@@ -69,7 +69,6 @@ button { outline: none; }
   border-bottom: 1px solid var(--line);
 }
 
-/* HD mark: dùng cho sidebar, ai-avatar, workspace-orbit */
 .hsd-logo {
   display: grid;
   place-items: center;
@@ -88,7 +87,6 @@ button { outline: none; }
   user-select: none;
 }
 
-/* Biến thể kích thước theo ngữ cảnh */
 .ai-avatar .hsd-logo {
   width: 17px;
   height: 17px;
@@ -100,7 +98,6 @@ button { outline: none; }
   border-radius: 9px;
 }
 
-/* Text "Hate Detect" — cả hai chữ đều trắng */
 .sidebar-brand-text {
   display: inline-flex;
   align-items: baseline;
@@ -275,19 +272,262 @@ button { outline: none; }
 .dots span { animation: blink 1.4s infinite both; font-size: 1rem; } .dots span:nth-child(2) { animation-delay: .2s; } .dots span:nth-child(3) { animation-delay: .4s; }
 
 .chat-footer { display: flex; flex-direction: column; align-items: center; width: min(100%, 900px); margin: 0 auto; padding: 10px 28px 16px; }
-.input-container { padding: 12px 12px 9px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--bg-panel); box-shadow: 0 12px 28px rgba(0,0,0,.12); }
+.input-container {
+  padding: 12px 12px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--bg-panel);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .12);
+  transition:
+    padding .28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color .22s ease,
+    box-shadow .22s ease,
+    background-color .22s ease;
+}
 .chat-footer .input-container { width: 100%; }
-.input-container:focus-within { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(60, 155, 255, .12); }
+
+.input-container:hover {
+  border-color: #3a5075;
+  background: var(--bg-elevated);
+  box-shadow:
+    0 0 0 1px rgba(60, 155, 255, .12),
+    0 14px 34px rgba(0, 0, 0, .16);
+}
+
+.input-container:focus-within {
+  padding: 18px 18px 13px;
+  border-color: var(--blue);
+  background: var(--bg-panel);
+  box-shadow:
+    0 0 0 2px rgba(60, 155, 255, .14),
+    0 18px 40px rgba(0, 0, 0, .20);
+}
+.app-shell--empty .input-container {
+  min-height: 124px;
+  padding: 18px 18px 13px;
+  border-radius: 18px;
+  border-color: #2b374c;
+  background: #0e121d;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .24);
+  transition:
+    padding .28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color .22s ease,
+    box-shadow .22s ease,
+    background-color .22s ease;
+}
+.app-shell--empty .input-container:hover {
+  border-color: #3f5878;
+  background: #111726;
+  box-shadow:
+    0 0 0 1px rgba(60, 155, 255, .15),
+    0 18px 50px rgba(0, 0, 0, .30);
+}
+
+.app-shell--empty .input-container:focus-within {
+  padding: 24px 22px 18px;
+  border-color: var(--blue);
+  background: #0e121d;
+  box-shadow:
+    0 0 0 2px rgba(60, 155, 255, .18),
+    0 22px 56px rgba(0, 0, 0, .34);
+}
 .chat-textarea { display: block; width: 100%; min-height: 27px; max-height: 200px; padding: 0; border: 0; outline: 0; resize: none; overflow-y: auto; color: var(--text); background: transparent; font-size: .75rem; line-height: 1.5; }
 .chat-textarea::placeholder { color: var(--muted); }
 .input-bottom-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
-.model-selector { position: relative; display: grid; grid-template-columns: repeat(var(--model-count), minmax(0, 1fr)); flex: 1; max-width: 560px; padding: 2px; overflow: hidden; border: 1px solid var(--line); border-radius: 4px; background: var(--bg-elevated); }
-.model-selector-indicator { position: absolute; z-index: 0; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / var(--model-count)); border-radius: 3px; background: #164f87; transform: translateX(calc(var(--model-index) * (100% + 2px))); transition: transform .25s ease; }
-.model-option { position: relative; z-index: 1; min-width: 0; min-height: 27px; padding: 0 5px; overflow: hidden; border: 0; border-radius: 3px; color: var(--muted); background: transparent; font-size: .58rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.model-option:hover { color: var(--text); } .model-option--active, .model-option--active:hover { color: #fff; }
+
+/* =========================================
+   MODEL SELECTOR — nested dropdown
+========================================= */
+.model-dropdown {
+  position: relative;
+  flex: 1;
+  max-width: 260px;
+}
+
+.model-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 29px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+  background: var(--bg-elevated);
+  font: 500 .6rem "DM Mono", monospace;
+  cursor: pointer;
+  transition: border-color .16s, background .16s, color .16s;
+}
+.model-dropdown-trigger:hover,
+.model-dropdown-trigger.is-open {
+  border-color: var(--line-strong);
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.model-dropdown-dot {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--blue);
+}
+.model-dropdown-current {
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-dropdown-chevron {
+  font-size: .7rem;
+  line-height: 1;
+  transition: transform .18s ease;
+}
+.model-dropdown-trigger.is-open .model-dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+/* Menu chính */
+.model-dropdown-menu {
+  position: absolute;
+  z-index: 50;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .32);
+  animation: modelMenuReveal .16s ease;
+}
+
+.model-dropdown-family {
+  position: relative;
+}
+
+.model-dropdown-family + .model-dropdown-family {
+  margin-top: 2px;
+  border-top: 1px solid var(--line);
+}
+
+.model-dropdown-family-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 4px;
+  color: var(--muted-strong);
+  font-size: .68rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .14s, color .14s;
+}
+.model-dropdown-family-row.has-current {
+  color: var(--blue);
+}
+
+.model-dropdown-family.is-hovered .model-dropdown-family-row {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.model-dropdown-family.is-hovered .model-dropdown-family-row.has-current {
+  color: var(--blue);
+}
+
+.model-dropdown-family-label {
+  flex: 1;
+}
+.model-dropdown-family-chevron {
+  font-size: .85rem;
+  line-height: 1;
+  opacity: .7;
+  transition: transform .18s ease, opacity .18s ease;
+}
+.model-dropdown-family.is-hovered .model-dropdown-family-chevron {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+/* Submenu -- nổi sang bên phải */
+.model-dropdown-submenu {
+  position: absolute;
+  z-index: 60;
+  top: 0;
+  left: 100%;
+  min-width: 240px;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .32);
+  animation: modelSubmenuReveal .16s ease;
+}
+
+.model-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--muted-strong);
+  background: transparent;
+  font-size: .68rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background .14s, color .14s;
+}
+.model-dropdown-item:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.model-dropdown-item.is-active {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.model-dropdown-item-short {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font: 700 .55rem "DM Mono", monospace;
+  opacity: .85;
+}
+.model-dropdown-item-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Manrope", sans-serif;
+}
+.model-dropdown-check {
+  color: var(--blue);
+  font-size: .72rem;
+}
+
+@keyframes modelMenuReveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes modelSubmenuReveal {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Giữ style cũ cho .model-current khi chỉ có 1 model (không còn dùng nữa nhưng giữ để tránh lỗi nếu có reference) */
 .model-current { display: inline-flex; align-items: center; gap: 6px; min-height: 29px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); background: var(--bg-elevated); font: .6rem "DM Mono", monospace; }
-.model-current-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--blue); }
-.model-current-state { color: var(--muted); font: .56rem "Manrope", sans-serif; }
+
 .send-button { display: grid; place-items: center; width: 31px; height: 31px; flex: 0 0 auto; padding: 0; border: 1px solid #4a9fe8; border-radius: 4px; color: #dff1ff; background: #164f87; cursor: pointer; transition: background .18s, transform .18s; }
 .send-button svg { width: 16px; height: 16px; }
 .send-button:not(:disabled):hover { background: #2369aa; transform: translateY(-1px); }
@@ -400,11 +640,30 @@ button { outline: none; }
   .table-caption { min-width: 620px; }
   .error-analysis-layout { grid-template-columns: 1fr; gap: 18px; }
   .error-analysis-heading { flex-direction: column; gap: 8px; }
+
+  /* Model dropdown trên mobile */
+  .model-dropdown { max-width: 200px; }
+  .model-dropdown-menu { min-width: 170px; }
+  .model-dropdown-submenu {
+    min-width: 200px;
+    max-width: calc(100vw - 60px);
+  }
 }
 @media (max-width: 470px) {
   .status-badge { font-size: 0; }
-  .model-option { padding: 0 2px; font-size: .52rem; }
   .verdict-head { align-items: flex-start; flex-direction: column; gap: 3px; }
+
+  /* Trên mobile rất nhỏ, submenu nổi sang phải có thể tràn màn hình.
+     Chuyển sang hiện bên dưới menu chính thay vì sang phải. */
+  .model-dropdown-submenu {
+    position: static;
+    min-width: 100%;
+    margin-top: 3px;
+    padding: 3px;
+    box-shadow: none;
+    border-color: var(--line);
+    animation: modelMenuReveal .14s ease;
+  }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
 
@@ -424,7 +683,6 @@ button { outline: none; }
 .app-shell--empty .input-container { min-height: 124px; padding: 18px 18px 13px; border-radius: 18px; border-color: #2b374c; background: #0e121d; box-shadow: 0 16px 42px rgba(0, 0, 0, .24); }
 .app-shell--empty .chat-textarea { min-height: 44px; font-size: .92rem; }
 .app-shell--empty .input-bottom-row { margin-top: 12px; }
-.app-shell--empty .model-selector { max-width: 610px; }
 .app-shell--empty .send-button { width: 36px; height: 36px; border-radius: 50%; }
 .app-shell--empty .footer-disclaimer { display: none; }
 
@@ -461,25 +719,15 @@ button { outline: none; }
 .app-shell {
   overflow: hidden;
 }
-
-/* 2. Cho phép flex item co lại nhỏ hơn content (min-height: 0 là mấu chốt) */
 .chat-layout {
   min-height: 0;
   overflow: hidden;
 }
-
-/* 3. .chat-messages giờ co được → overflow-y: auto mới thực sự kích hoạt */
 .chat-messages {
   min-height: 0;
-}
-
-/* 4. Scrollbar dễ thấy hơn (Firefox + Chrome/Edge 121+) */
-.chat-messages {
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
 }
-
-/* Chrome/Edge cũ (< 121) dùng pseudo-element truyền thống */
 .chat-messages::-webkit-scrollbar {
   width: 10px;
 }
@@ -493,4 +741,120 @@ button { outline: none; }
 }
 .chat-messages::-webkit-scrollbar-thumb:hover {
   background: var(--blue);
+}
+/* =========================================
+   MOBILE PATCH -- test trên iOS Safari + Android Chrome
+========================================= */
+
+/* 1. iOS Safari: tránh auto-zoom khi focus input (cần font-size >= 16px) */
+@media (max-width: 760px) {
+  .chat-textarea,
+  .chat-textarea:focus,
+  .app-shell--empty .chat-textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* 2. Mobile viewport height -- tránh thanh địa chỉ che input */
+@supports (height: 100dvh) {
+  html, body, #root, .app-shell {
+    height: 100dvh;
+  }
+}
+
+/* 3. Safe area cho iPhone notch + home indicator */
+.chat-footer {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 760px) {
+  .chat-footer {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(15px + env(safe-area-inset-left, 0px));
+    padding-right: calc(15px + env(safe-area-inset-right, 0px));
+  }
+}
+
+/* 4. Tap targets >= 44px (Apple HIG) */
+@media (max-width: 760px) {
+  .model-dropdown-trigger {
+    min-height: 44px;
+  }
+  .send-button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .model-dropdown-item,
+  .model-dropdown-family-row {
+    min-height: 44px;
+  }
+  .sidebar-tool,
+  .new-chat-button {
+    min-height: 44px;
+  }
+  .greeting-chip {
+    min-height: 52px;
+    padding: 12px 14px;
+  }
+  .xai-toggle {
+    min-height: 44px;
+    padding: 14px 16px;
+  }
+}
+
+/* 5. Bỏ tap highlight xanh/xám trên iOS + Android */
+button,
+a,
+.model-dropdown-trigger,
+.model-dropdown-item,
+.model-dropdown-family-row,
+.greeting-chip,
+.sidebar-tool,
+.xai-toggle,
+.ghost-btn {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 6. Bỏ delay 300ms khi tap (chỉ áp dụng cho control) */
+button,
+.model-dropdown-trigger,
+.model-dropdown-item,
+.model-dropdown-family-row,
+.greeting-chip,
+.send-button {
+  touch-action: manipulation;
+}
+
+/* 7. Ngăn chọn text khi tap nút */
+.model-dropdown-trigger,
+.model-dropdown-item,
+.model-dropdown-family-row,
+.send-button,
+.sidebar-tool,
+.new-chat-button,
+.greeting-chip {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 8. iOS text-size-adjust -- tránh iOS phóng to chữ trong landscape */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* 9. Fallback font nếu Google Fonts bị chặn (mạng mobile yếu) */
+body {
+  font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+h1, h2, h3, .verdict-name, .workspace-heading h1 {
+  font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.model-dropdown-current,
+.chip-label,
+.xai-value,
+.verdict-meta {
+  font-family: "DM Mono", "SF Mono", Menlo, Consolas, monospace;
 }

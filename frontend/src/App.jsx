@@ -9,15 +9,29 @@ const EXAMPLES = [
   { label: "Thù ghét", text: "mày khôn lắm thằng ngu ạ" },
 ];
 
-const MODEL_OPTIONS = [
-  { value: "phobert_baseline",  label: "PhoBERT Baseline",       shortLabel: "P-Base" },
-  { value: "phobert_bt",        label: "PhoBERT Back-Translation", shortLabel: "P-BT" },
-  { value: "phobert_eda",       label: "PhoBERT EDA",             shortLabel: "P-EDA" },
-  { value: "phobert_llm",       label: "PhoBERT LLM-Gen",         shortLabel: "P-LLM" },
-  { value: "phobert_combined",  label: "PhoBERT Combined",        shortLabel: "P-Comb" },
-  { value: "visobert_baseline", label: "ViSoBERT Baseline",       shortLabel: "V-Base" },
-  { value: "visobert_combined", label: "ViSoBERT Combined",       shortLabel: "V-Comb" },
+const MODEL_FAMILIES = [
+  {
+    value: "phobert",
+    label: "PhoBERT",
+    models: [
+      { value: "phobert_baseline",  label: "PhoBERT Baseline",         shortLabel: "P-Base" },
+      { value: "phobert_bt",        label: "PhoBERT Back-Translation", shortLabel: "P-BT" },
+      { value: "phobert_eda",       label: "PhoBERT EDA",              shortLabel: "P-EDA" },
+      { value: "phobert_llm",       label: "PhoBERT LLM-Gen",          shortLabel: "P-LLM" },
+      { value: "phobert_combined",  label: "PhoBERT Combined",         shortLabel: "P-Comb" },
+    ],
+  },
+  {
+    value: "visobert",
+    label: "ViSoBERT",
+    models: [
+      { value: "visobert_baseline", label: "ViSoBERT Baseline", shortLabel: "V-Base" },
+      { value: "visobert_combined", label: "ViSoBERT Combined", shortLabel: "V-Comb" },
+    ],
+  },
 ];
+
+const MODEL_OPTIONS = MODEL_FAMILIES.flatMap((f) => f.models);
 
 const TOOL_OPTIONS = [
   {
@@ -62,8 +76,6 @@ const MODEL_CATALOG = [
 
 const DEFAULT_MODEL = "phobert_combined";
 
-// Error analysis -- vẫn hardcode vì backend chưa có endpoint cho phần này.
-// TODO: chuyển sang /evaluation/errors?model=<exp> khi có file confusion_summary.
 const COMBINED_ERRORS = [
   { from: "CLEAN", to: "OFFENSIVE", count: 946, tone: "offensive" },
   { from: "CLEAN", to: "HATE", count: 287, tone: "hate" },
@@ -136,7 +148,6 @@ function formatHistoryDate(value) {
   }).format(new Date(value));
 }
 
-// CSS class-safe: "phobert_baseline" -> "phobert-baseline"
 function cssKey(experiment) {
   return String(experiment ?? "").replace(/_/g, "-");
 }
@@ -179,6 +190,128 @@ function ToolLogo({ type }) {
 
 function SidebarToggleIcon() {
   return <PanelLeft aria-hidden="true" />;
+}
+
+// ==========================================
+// MODEL SELECTOR — nested dropdown, hover family để mở submenu sang phải
+// ==========================================
+function ModelSelector({ availableOptions, currentModel, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const [hoveredFamily, setHoveredFamily] = useState(null);
+  const wrapperRef = useRef(null);
+
+  // Đóng khi click ra ngoài
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setOpen(false);
+        setHoveredFamily(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  // Đóng khi nhấn ESC
+  useEffect(() => {
+    if (!open) return;
+    function handleKey(event) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        setHoveredFamily(null);
+      }
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [open]);
+
+  const currentOption = availableOptions.find((o) => o.value === currentModel);
+
+  // Chỉ hiển thị family có model available
+  const families = MODEL_FAMILIES
+    .map((family) => ({
+      ...family,
+      models: family.models.filter((m) =>
+        availableOptions.some((o) => o.value === m.value)
+      ),
+    }))
+    .filter((family) => family.models.length > 0);
+
+  function handleModelClick(modelValue) {
+    onSelect(modelValue);
+    setOpen(false);
+    setHoveredFamily(null);
+  }
+
+  return (
+    <div className="model-dropdown" ref={wrapperRef}>
+      <button
+        type="button"
+        className={`model-dropdown-trigger${open ? " is-open" : ""}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        title={currentOption?.label}
+      >
+        <span className="model-dropdown-dot" aria-hidden="true" />
+        <span className="model-dropdown-current">
+          {currentOption?.shortLabel ?? "Chọn model"}
+        </span>
+        <span className="model-dropdown-chevron" aria-hidden="true">▾</span>
+      </button>
+
+      {open && (
+        <div
+          className="model-dropdown-menu"
+          role="listbox"
+          onMouseLeave={() => setHoveredFamily(null)}
+        >
+          {families.map((family) => {
+            const hasCurrent = family.models.some((m) => m.value === currentModel);
+            const isHovered = hoveredFamily === family.value;
+            return (
+              <div
+                key={family.value}
+                className={`model-dropdown-family${isHovered ? " is-hovered" : ""}`}
+                onMouseEnter={() => setHoveredFamily(family.value)}
+              >
+                <div
+                  className={`model-dropdown-family-row${hasCurrent ? " has-current" : ""}`}
+                >
+                  <span className="model-dropdown-family-label">{family.label}</span>
+                  <span className="model-dropdown-family-chevron" aria-hidden="true">›</span>
+                </div>
+
+                {isHovered && (
+                  <div className="model-dropdown-submenu" role="listbox">
+                    {family.models.map((m) => {
+                      const isActive = m.value === currentModel;
+                      return (
+                        <button
+                          type="button"
+                          key={m.value}
+                          className={`model-dropdown-item${isActive ? " is-active" : ""}`}
+                          onClick={() => handleModelClick(m.value)}
+                          role="option"
+                          aria-selected={isActive}
+                          title={m.label}
+                        >
+                          <span className="model-dropdown-item-short">{m.shortLabel}</span>
+                          <span className="model-dropdown-item-label">{m.label}</span>
+                          {isActive && <span className="model-dropdown-check" aria-hidden="true">✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ModelWorkspace({ activeModel, onSelectModel }) {
@@ -591,7 +724,6 @@ export default function App() {
         setMetadata(payload);
         setStatus("online");
 
-        // Metrics là optional -- không block trạng thái online.
         try {
           const metricsRes = await fetch(`${API_BASE_URL}/evaluation/metrics`);
           if (metricsRes.ok) {
@@ -599,7 +731,7 @@ export default function App() {
             setEvaluationMetrics(Array.isArray(metrics) ? metrics : []);
           }
         } catch {
-          // Bỏ qua -- EvaluationWorkspace sẽ hiện empty state.
+          // Metrics optional -- không block trạng thái online.
         }
       } catch {
         setStatus("offline");
@@ -919,40 +1051,11 @@ export default function App() {
               rows={1}
             />
             <div className="input-bottom-row">
-              {availableModelOptions.length === 1 ? (
-                <div className="model-current" title={availableModelOptions[0].label}>
-                  <span className="model-current-dot" aria-hidden="true" />
-                  <span>{availableModelOptions[0].shortLabel}</span>
-                  <span className="model-current-state">đang dùng</span>
-                </div>
-              ) : (
-                <div
-                  className="model-selector"
-                  role="tablist"
-                  aria-label="Chọn mô hình phân loại"
-                  style={{ "--model-count": availableModelOptions.length }}
-                >
-                  <span
-                    className="model-selector-indicator"
-                    style={{ "--model-index": availableModelOptions.findIndex((option) => option.value === model) }}
-                    aria-hidden="true"
-                  />
-                  {availableModelOptions.map((opt) => (
-                    <button
-                      type="button"
-                      key={opt.value}
-                      role="tab"
-                      aria-selected={model === opt.value}
-                      aria-label={opt.label}
-                      title={opt.label}
-                      className={`model-option${model === opt.value ? " model-option--active" : ""}`}
-                      onClick={() => setModel(opt.value)}
-                    >
-                      {opt.shortLabel}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <ModelSelector
+                availableOptions={availableModelOptions}
+                currentModel={model}
+                onSelect={setModel}
+              />
 
               <button
                 className="send-button"

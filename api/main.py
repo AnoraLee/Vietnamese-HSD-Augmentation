@@ -151,6 +151,24 @@ def _resolve_service(model_key: str | None) -> tuple[str, HSDInferenceService]:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+@app.get("/")
+def root():
+    return {
+        "name": "Vietnamese Hate Speech Detection API",
+        "version": "1.0",
+        "status": "ok",
+        "docs": "/docs",
+        "health": "/health",
+        "endpoints": [
+            "/health",
+            "/metadata",
+            "/predict",
+            "/predict/batch",
+            "/explain",
+            "/evaluation/metrics",
+        ],
+    }
+
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     _require_services()
