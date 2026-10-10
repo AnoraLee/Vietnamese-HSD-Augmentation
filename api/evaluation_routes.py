@@ -1,13 +1,19 @@
 """Read precomputed evaluation metrics từ results/metrics/ và expose qua API."""
 from __future__ import annotations
 
+import csv
 import json
 import logging
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from src.utils.constants import EXPERIMENT_ORDER, METRICS_DIR, RESULTS_DIR
+from src.utils.constants import (
+    ERROR_ANALYSIS_DIR,
+    EXPERIMENT_ORDER,
+    METRICS_DIR,
+    RESULTS_DIR,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,3 +89,63 @@ def get_evaluation_metrics() -> list[dict]:
         by_experiment.values(),
         key=lambda row: order_index.get(row["experiment"], len(order_index)),
     )
+
+
+CONFUSION_FILENAME = "confusion_summary.csv"
+
+
+def _confusion_path_candidates() -> list[Path]:
+    """Ưu tiên results/error_analysis/, fallback results/ nếu layout khác."""
+    return [ERROR_ANALYSIS_DIR / CONFUSION_FILENAME, RESULTS_DIR / CONFUSION_FILENAME]
+
+
+@router.get("/errors")
+def get_evaluation_errors() -> dict[str, list[dict]]:
+    """Confusion counts theo từng experiment, đọc từ confusion_summary.csv.
+
+    Shape: {"phobert_baseline": [{"from": "CLEAN", "to": "OFFENSIVE", "count": 333}, ...]}
+    Mỗi list sort giảm dần theo count để frontend lấy phần tử đầu làm lỗi nổi bật.
+    Số dòng mỗi experiment không cố định -- model không mắc một loại lỗi nào đó
+    thì CSV không có dòng tương ứng.
+    """
+    path = next((p for p in _confusion_path_candidates() if p.exists()), None)
+    if path is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "no_confusion_summary",
+                "message": (
+                    f"No {CONFUSION_FILENAME} found under "
+                    f"{[str(p.parent) for p in _confusion_path_candidates()]}."
+                ),
+            },
+        )
+
+    by_experiment: dict[str, list[dict]] = {}
+    try:
+        with path.open(encoding="utf-8", newline="") as f:
+            for row in csv.DictReader(f):
+                experiment = (row.get("experiment") or "").strip()
+                true_label = (row.get("true_label") or "").strip()
+                predicted_as = (row.get("predicted_as") or "").strip()
+                if not (experiment and true_label and predicted_as):
+                    continue
+                try:
+                    count = int(float(row.get("count") or 0))
+                except (TypeError, ValueError):
+                    continue
+                if count <= 0:
+                    continue
+                by_experiment.setdefault(experiment, []).append(
+                    {"from": true_label, "to": predicted_as, "count": count}
+                )
+    except OSError:
+        logger.exception("Failed to read %s", path)
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "confusion_unreadable", "message": f"Cannot read {path.name}."},
+        ) from None
+
+    for rows in by_experiment.values():
+        rows.sort(key=lambda item: item["count"], reverse=True)
+    return by_experiment
