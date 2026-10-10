@@ -464,9 +464,9 @@ button { outline: none; }
 .app-shell--empty .tool-logo { width: 32px; height: 32px; transform: scale(1.08); }
 .app-shell--empty .tool-logo svg { width: 27px; height: 27px; }
 .app-shell--empty .chat-footer { position: absolute; z-index: 2; top: 50%; left: 50%; width: min(100%, 900px); padding: 10px 28px 16px; transform: translate(-50%, 128px); }
-.app-shell--empty .input-container { padding: 18px 18px 13px; border-radius: 18px; border-color: var(--line-strong); background: var(--bg-panel); box-shadow: 0 16px 42px rgba(0, 0, 0, .24); }
-.app-shell--empty .chat-textarea { min-height: 36px; font-size: 16px; }
-.app-shell--empty .input-bottom-row { margin-top: 12px; }
+.app-shell--empty .input-container { padding: 14px 14px 11px; border-radius: 18px; border-color: var(--line-strong); background: var(--bg-panel); box-shadow: 0 16px 42px rgba(0, 0, 0, .24); }
+.app-shell--empty .chat-textarea { min-height: 27px; font-size: 16px; }
+.app-shell--empty .input-bottom-row { margin-top: 10px; }
 .app-shell--empty .model-selector { max-width: 610px; }
 .app-shell--empty .send-button { width: 38px; height: 38px; border-radius: 50%; }
 .app-shell--empty .footer-disclaimer { display: none; }
