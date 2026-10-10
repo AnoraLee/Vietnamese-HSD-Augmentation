@@ -123,3 +123,30 @@ def test_explain_rejects_too_small_max_evals(client):
 def test_explain_rejects_blank_text(client):
     r = client.post("/explain", json={"text": "   "})
     assert r.status_code == 422
+
+def test_errors_returns_counts_per_experiment(client):
+    r = client.get("/evaluation/errors")
+    assert r.status_code == 200
+    body = r.json()
+    assert isinstance(body, dict) and body
+
+    for experiment, rows in body.items():
+        assert isinstance(experiment, str) and experiment
+        assert rows, f"{experiment} có key nhưng không có dòng nào"
+        for row in rows:
+            assert set(row) == {"from", "to", "count"}
+            assert row["from"] != row["to"], "dòng đúng không phải lỗi"
+            assert isinstance(row["count"], int) and row["count"] > 0
+        counts = [row["count"] for row in rows]
+        assert counts == sorted(counts, reverse=True), f"{experiment} chưa sort giảm dần"
+
+
+def test_errors_experiments_overlap_metrics(client):
+    metrics = {row["experiment"] for row in client.get("/evaluation/metrics").json()}
+    errors = set(client.get("/evaluation/errors").json())
+    assert metrics & errors, "không experiment nào có cả metrics lẫn confusion counts"
+
+
+def test_explain_rejects_blank_text(client):
+    r = client.post("/explain", json={"text": "   "})
+    assert r.status_code == 422
