@@ -80,7 +80,7 @@ button { outline: none; }
   border-bottom: 1px solid var(--line);
 }
 
-/* HD mark: dùng cho sidebar, ai-avatar, workspace-orbit */
+/* HD mark: dùng cho sidebar và ai-avatar */
 .hsd-logo {
   display: grid;
   place-items: center;
@@ -104,11 +104,6 @@ button { outline: none; }
   width: 17px;
   height: 17px;
   border-radius: 3px;
-}
-.workspace-orbit .hsd-logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 9px;
 }
 
 /* Text "Hate Detect" — cả hai chữ đều trắng */
@@ -155,9 +150,6 @@ button { outline: none; }
   background: var(--bg-hover);
 }
 
-.new-chat-button { display: flex; align-items: center; gap: 11px; min-height: 31px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 5px; color: var(--muted-strong); background: var(--bg-panel); font-family: "Be Vietnam Pro", sans-serif; font-size: 14px; font-weight: 800; line-height: 1; cursor: pointer; }
-.new-chat-icon { width: 14px; height: 14px; color: var(--blue); stroke-width: 2; }
-.new-chat-button:hover { border-color: var(--blue); background: var(--bg-hover); }
 .sidebar-section { display: flex; flex-direction: column; gap: 4px; }
 .sidebar-label { padding: 0 8px 4px; color: var(--muted); font: 700 12px "Be Vietnam Pro", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .sidebar-tool { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 38px; padding: 0 9px; border: 0; border-radius: 5px; color: var(--muted-strong); background: transparent; font-size: 14px; font-weight: 800; text-align: left; cursor: pointer; transition: color .16s, background .16s; }
@@ -172,12 +164,10 @@ button { outline: none; }
 .app-shell--sidebar-collapsed .app-sidebar { align-items: center; padding-left: 8px; padding-right: 8px; }
 .app-shell--sidebar-collapsed .sidebar-brand { flex-direction: column; gap: 10px; padding: 0 0 13px; }
 .app-shell--sidebar-collapsed .sidebar-brand-text,
-.app-shell--sidebar-collapsed .new-chat-label,
 .app-shell--sidebar-collapsed .sidebar-label,
 .app-shell--sidebar-collapsed .sidebar-tool-label,
 .app-shell--sidebar-collapsed .sidebar-note-label { display: none; }
 .app-shell--sidebar-collapsed .sidebar-toggle { margin-left: 0; }
-.app-shell--sidebar-collapsed .new-chat-button { justify-content: center; width: 36px; min-height: 31px; padding: 0; }
 .app-shell--sidebar-collapsed .sidebar-section { width: 100%; }
 .app-shell--sidebar-collapsed .sidebar-tool { justify-content: center; min-height: 38px; padding: 0; }
 .app-shell--sidebar-collapsed .sidebar-note { justify-content: center; padding: 0; }
@@ -315,23 +305,8 @@ button { outline: none; }
 .workspace-heading h1 { margin: 12px 0 9px; color: var(--text); font: 700 clamp(2rem, 4vw, 3.4rem)/1 "Be Vietnam Pro", sans-serif; letter-spacing: -.055em; }
 .workspace-heading p { max-width: 600px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .workspace-heading code { color: var(--muted-strong); font-family: "JetBrains Mono", monospace; font-size: 14px; }
-.workspace-orbit { display: grid; place-items: center; width: 86px; height: 86px; border: 1px solid var(--line-strong); border-radius: 50%; background: radial-gradient(circle, var(--blue-soft) 0, transparent 68%); }
-.model-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.model-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; min-height: 194px; padding: 18px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; color: var(--text); background: var(--bg-panel); text-align: left; cursor: pointer; transition: border-color .2s, transform .2s, background .2s; }
-.model-card::after { position: absolute; right: -24px; bottom: -40px; width: 130px; height: 130px; border: 1px solid currentColor; border-radius: 50%; opacity: .12; content: ""; }
-.model-card:hover, .model-card--selected { border-color: currentColor; background: var(--bg-hover); transform: translateY(-3px); }
-.model-card--blue { color: #5dafff; } .model-card--violet { color: #b193ff; } .model-card--amber { color: #e7b65f; } .model-card--pink { color: #ed8cae; } .model-card--green { color: #4ed0a2; }
-.model-card-top { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 23px; }
-.model-glyph { display: grid; place-items: center; min-width: 49px; height: 29px; padding: 0 8px; border: 1px solid currentColor; border-radius: 4px; font: 700 12px "JetBrains Mono", monospace; }
-.model-live { color: currentColor; font: 500 12px "JetBrains Mono", monospace; letter-spacing: .06em; }
-.model-card strong { color: var(--text); font-size: 16px; font-weight: 800; }
-.model-path { margin-top: 7px; color: currentColor; font: 12px "JetBrains Mono", monospace; opacity: .8; }
-.model-card small { max-width: 245px; margin-top: 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.model-card-arrow { position: absolute; right: 17px; bottom: 15px; color: currentColor; font-size: 1rem; }
-.model-footer-line { display: flex; align-items: center; gap: 14px; margin-top: 31px; color: var(--muted); font: 12px "JetBrains Mono", monospace; text-align: center; }
-.model-footer-line span { height: 1px; flex: 1; background: var(--line); }
 
-.metric-spotlight { display: grid; grid-template-columns: 1.25fr repeat(3, 1fr); gap: 1px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--line); }
+.metric-spotlight { display: grid; grid-template-columns: 1.25fr repeat(3, 1fr); gap: 1px; margin: 18px 0 16px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--line); }
 .metric-spotlight > div { min-height: 105px; padding: 16px; background: var(--bg-panel); }
 .metric-spotlight > div:first-child { background: linear-gradient(135deg, var(--spotlight-tint), var(--bg-panel)); }
 .metric-spotlight span { display: block; color: var(--muted); font: 500 12px "JetBrains Mono", monospace; letter-spacing: .08em; }
@@ -364,12 +339,15 @@ button { outline: none; }
 .evaluation-row--eda { --evaluation-accent: #e7b65f; }
 .evaluation-row--llm { --evaluation-accent: #ed8cae; }
 .evaluation-row--combined { --evaluation-accent: #4ed0a2; }
-.evaluation-row:not(.evaluation-row--head) { border-left: 3px solid var(--evaluation-accent); }
+.evaluation-row:not(.evaluation-row--head) { border-left: 3px solid var(--evaluation-accent); cursor: pointer; transition: background .14s, color .14s; }
+.evaluation-row:not(.evaluation-row--head):hover { color: var(--text); background: var(--bg-hover); }
+.evaluation-row:not(.evaluation-row--head):focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 .evaluation-row:not(.evaluation-row--head) > span:first-child { color: var(--evaluation-accent); }
 .evaluation-row > span:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
 .run-dot { display: inline-block; width: 6px; height: 6px; margin-right: 9px; border-radius: 50%; background: var(--muted); }
 .run-dot--baseline { background: #5dafff; } .run-dot--bt { background: #b193ff; } .run-dot--eda { background: #e7b65f; } .run-dot--llm { background: #ed8cae; } .run-dot--combined { background: #4ed0a2; }
-.error-analysis-panel { margin-top: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); }
+/* Khối đầu tiên dưới tiêu đề -- khoảng cách đã do .workspace-heading lo. */
+.error-analysis-panel { padding: 18px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); }
 .error-analysis-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 17px; }
 .error-analysis-heading h2 { margin: 8px 0 0; color: var(--text); font: 700 22px "Be Vietnam Pro", sans-serif; }
 .error-analysis-source { color: var(--muted); font: 12px "JetBrains Mono", monospace; }
@@ -411,9 +389,7 @@ button { outline: none; }
   .xai-row { grid-template-columns: minmax(45px, 70px) 1fr 50px; gap: 7px; }
   .workspace-view { padding: 28px 0 35px; }
   .workspace-heading { margin-bottom: 22px; }
-  .workspace-orbit, .evaluation-stamp { display: none; }
-  .model-grid { grid-template-columns: 1fr; }
-  .model-card { min-height: 160px; }
+  .evaluation-stamp { display: none; }
   .metric-spotlight { grid-template-columns: repeat(2, 1fr); }
   .metric-spotlight > div:first-child { grid-column: span 2; }
   /* Caption cuộn theo trang và cho chip xuống dòng; chỉ riêng bảng cuộn ngang,
