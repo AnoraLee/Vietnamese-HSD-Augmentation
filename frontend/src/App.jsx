@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { Boxes, ChartNoAxesColumnIncreasing, History, PanelLeft, Plus, ShieldAlert } from "lucide-react";
+import { ChartNoAxesColumnIncreasing, History, Moon, PanelLeft, ShieldAlert, Sun, X } from "lucide-react";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 
@@ -9,29 +9,15 @@ const EXAMPLES = [
   { label: "Thù ghét", text: "mày khôn lắm thằng ngu ạ" },
 ];
 
-const MODEL_FAMILIES = [
-  {
-    value: "phobert",
-    label: "PhoBERT",
-    models: [
-      { value: "phobert_baseline",  label: "PhoBERT Baseline",         shortLabel: "P-Base" },
-      { value: "phobert_bt",        label: "PhoBERT Back-Translation", shortLabel: "P-BT" },
-      { value: "phobert_eda",       label: "PhoBERT EDA",              shortLabel: "P-EDA" },
-      { value: "phobert_llm",       label: "PhoBERT LLM-Gen",          shortLabel: "P-LLM" },
-      { value: "phobert_combined",  label: "PhoBERT Combined",         shortLabel: "P-Comb" },
-    ],
-  },
-  {
-    value: "visobert",
-    label: "ViSoBERT",
-    models: [
-      { value: "visobert_baseline", label: "ViSoBERT Baseline", shortLabel: "V-Base" },
-      { value: "visobert_combined", label: "ViSoBERT Combined", shortLabel: "V-Comb" },
-    ],
-  },
+const MODEL_OPTIONS = [
+  { value: "phobert_baseline",  label: "PhoBERT Baseline",       shortLabel: "P-Base" },
+  { value: "phobert_bt",        label: "PhoBERT Back-Translation", shortLabel: "P-BT" },
+  { value: "phobert_eda",       label: "PhoBERT EDA",             shortLabel: "P-EDA" },
+  { value: "phobert_llm",       label: "PhoBERT LLM-Gen",         shortLabel: "P-LLM" },
+  { value: "phobert_combined",  label: "PhoBERT Combined",        shortLabel: "P-Comb" },
+  { value: "visobert_baseline", label: "ViSoBERT Baseline",       shortLabel: "V-Base" },
+  { value: "visobert_combined", label: "ViSoBERT Combined",       shortLabel: "V-Comb" },
 ];
-
-const MODEL_OPTIONS = MODEL_FAMILIES.flatMap((f) => f.models);
 
 const TOOL_OPTIONS = [
   {
@@ -49,13 +35,6 @@ const TOOL_OPTIONS = [
     description: "Các phiên phân loại gần đây sẽ được hiển thị ở đây.",
   },
   {
-    value: "models",
-    label: "Các mô hình",
-    icon: Boxes,
-    title: "Các mô hình đang dùng",
-    description: "Theo dõi các phiên bản PhoBERT và dữ liệu tăng cường được kết nối với workspace.",
-  },
-  {
     value: "evaluation",
     label: "Đánh giá kết quả",
     icon: ChartNoAxesColumnIncreasing,
@@ -64,26 +43,10 @@ const TOOL_OPTIONS = [
   },
 ];
 
-const MODEL_CATALOG = [
-  { value: "phobert_baseline",  name: "PhoBERT Baseline",  short: "P-BASE", path: "models/phobert_baseline_phobert",  accent: "blue",   note: "..." },
-  { value: "phobert_bt",        name: "PhoBERT BT",         short: "P-BT",   path: "models/phobert_bt_phobert",        accent: "violet", note: "..." },
-  { value: "phobert_eda",       name: "PhoBERT EDA",        short: "P-EDA",  path: "models/phobert_eda_phobert",       accent: "amber",  note: "..." },
-  { value: "phobert_llm",       name: "PhoBERT LLM",        short: "P-LLM",  path: "models/phobert_llm_phobert",       accent: "pink",   note: "..." },
-  { value: "phobert_combined",  name: "PhoBERT Combined",   short: "P-COMB", path: "models/phobert_combined_phobert",  accent: "green",  note: "..." },
-  { value: "visobert_baseline", name: "ViSoBERT Baseline",  short: "V-BASE", path: "models/visobert_baseline_phobert", accent: "cyan",   note: "..." },
-  { value: "visobert_combined", name: "ViSoBERT Combined",  short: "V-COMB", path: "models/visobert_combined_phobert", accent: "teal",   note: "..." },
-];
-
 const DEFAULT_MODEL = "phobert_combined";
 
-const COMBINED_ERRORS = [
-  { from: "CLEAN", to: "OFFENSIVE", count: 946, tone: "offensive" },
-  { from: "CLEAN", to: "HATE", count: 287, tone: "hate" },
-  { from: "HATE", to: "OFFENSIVE", count: 156, tone: "offensive" },
-  { from: "HATE", to: "CLEAN", count: 124, tone: "clean" },
-  { from: "OFFENSIVE", to: "CLEAN", count: 115, tone: "clean" },
-  { from: "OFFENSIVE", to: "HATE", count: 99, tone: "hate" },
-];
+// Màu thanh lỗi lấy theo nhãn bị dự đoán nhầm thành.
+const ERROR_TONES = { CLEAN: "clean", OFFENSIVE: "offensive", HATE: "hate" };
 
 const VERDICTS = {
   CLEAN: { name: "Không độc hại", gloss: "Không phát hiện dấu hiệu thù ghét hay xúc phạm.", className: "clean" },
@@ -98,6 +61,15 @@ function apiErrorMessage(payload, fallback) {
 }
 
 const HISTORY_STORAGE_KEY = "hsd-analysis-history";
+const THEME_STORAGE_KEY = "hsd-theme";
+
+function readStoredTheme() {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "light" || stored === "dark") return stored;
+  } catch {}
+  return "dark";
+}
 
 function readStoredHistory() {
   try {
@@ -148,6 +120,7 @@ function formatHistoryDate(value) {
   }).format(new Date(value));
 }
 
+// CSS class-safe: "phobert_baseline" -> "phobert-baseline"
 function cssKey(experiment) {
   return String(experiment ?? "").replace(/_/g, "-");
 }
@@ -192,165 +165,30 @@ function SidebarToggleIcon() {
   return <PanelLeft aria-hidden="true" />;
 }
 
-// ==========================================
-// MODEL SELECTOR — nested dropdown, hover family để mở submenu sang phải
-// ==========================================
-function ModelSelector({ availableOptions, currentModel, onSelect }) {
-  const [open, setOpen] = useState(false);
-  const [hoveredFamily, setHoveredFamily] = useState(null);
-  const wrapperRef = useRef(null);
+const METRIC_COLUMNS = [
+  { id: "accuracy", label: "ACCURACY" },
+  { id: "macroF1", label: "MACRO-F1" },
+  { id: "weightedF1", label: "WEIGHTED-F1" },
+  { id: "hateF1", label: "HATE-F1" },
+];
 
-  // Đóng khi click ra ngoài
-  useEffect(() => {
-    if (!open) return;
-    function handleClickOutside(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setOpen(false);
-        setHoveredFamily(null);
+function EvaluationWorkspace({ activeModel, metrics = [], errors = {} }) {
+  // Hook phải nằm trên early return bên dưới.
+  const [visibleColumns, setVisibleColumns] = useState(() => METRIC_COLUMNS.map((col) => col.id));
+  // Model xem trên màn này, khởi tạo theo model đang dùng ở trình phân loại
+  // nhưng đổi được độc lập -- xem kết quả model khác không phải đổi model đang chạy.
+  const [pickedModel, setPickedModel] = useState(null);
+
+  function toggleColumn(id) {
+    setVisibleColumns((prev) => {
+      if (!prev.includes(id)) {
+        // Giữ nguyên thứ tự cột gốc khi bật lại.
+        return METRIC_COLUMNS.filter((col) => prev.includes(col.id) || col.id === id).map((col) => col.id);
       }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
-
-  // Đóng khi nhấn ESC
-  useEffect(() => {
-    if (!open) return;
-    function handleKey(event) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        setHoveredFamily(null);
-      }
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [open]);
-
-  const currentOption = availableOptions.find((o) => o.value === currentModel);
-
-  // Chỉ hiển thị family có model available
-  const families = MODEL_FAMILIES
-    .map((family) => ({
-      ...family,
-      models: family.models.filter((m) =>
-        availableOptions.some((o) => o.value === m.value)
-      ),
-    }))
-    .filter((family) => family.models.length > 0);
-
-  function handleModelClick(modelValue) {
-    onSelect(modelValue);
-    setOpen(false);
-    setHoveredFamily(null);
+      // Bỏ hết cột số thì bảng vô nghĩa -- luôn chừa lại một cột.
+      return prev.length <= 1 ? prev : prev.filter((colId) => colId !== id);
+    });
   }
-
-  return (
-    <div className="model-dropdown" ref={wrapperRef}>
-      <button
-        type="button"
-        className={`model-dropdown-trigger${open ? " is-open" : ""}`}
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        title={currentOption?.label}
-      >
-        <span className="model-dropdown-dot" aria-hidden="true" />
-        <span className="model-dropdown-current">
-          {currentOption?.shortLabel ?? "Chọn model"}
-        </span>
-        <span className="model-dropdown-chevron" aria-hidden="true">▾</span>
-      </button>
-
-      {open && (
-        <div
-          className="model-dropdown-menu"
-          role="listbox"
-          onMouseLeave={() => setHoveredFamily(null)}
-        >
-          {families.map((family) => {
-            const hasCurrent = family.models.some((m) => m.value === currentModel);
-            const isHovered = hoveredFamily === family.value;
-            return (
-              <div
-                key={family.value}
-                className={`model-dropdown-family${isHovered ? " is-hovered" : ""}`}
-                onMouseEnter={() => setHoveredFamily(family.value)}
-              >
-                <div
-                  className={`model-dropdown-family-row${hasCurrent ? " has-current" : ""}`}
-                >
-                  <span className="model-dropdown-family-label">{family.label}</span>
-                  <span className="model-dropdown-family-chevron" aria-hidden="true">›</span>
-                </div>
-
-                {isHovered && (
-                  <div className="model-dropdown-submenu" role="listbox">
-                    {family.models.map((m) => {
-                      const isActive = m.value === currentModel;
-                      return (
-                        <button
-                          type="button"
-                          key={m.value}
-                          className={`model-dropdown-item${isActive ? " is-active" : ""}`}
-                          onClick={() => handleModelClick(m.value)}
-                          role="option"
-                          aria-selected={isActive}
-                          title={m.label}
-                        >
-                          <span className="model-dropdown-item-short">{m.shortLabel}</span>
-                          <span className="model-dropdown-item-label">{m.label}</span>
-                          {isActive && <span className="model-dropdown-check" aria-hidden="true">✓</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ModelWorkspace({ activeModel, onSelectModel }) {
-  return (
-    <div className="workspace-view workspace-view--models">
-      <div className="workspace-heading">
-        <div>
-          <span className="workspace-kicker">MODEL REGISTRY / 05 ACTIVE</span>
-          <h1>Các mô hình đang dùng</h1>
-          <p>Năm phiên bản PhoBERT được huấn luyện và sẵn sàng cho pipeline phân loại tiếng Việt.</p>
-        </div>
-        <div className="workspace-orbit" aria-hidden="true"><HsdLogo /></div>
-      </div>
-      <div className="model-grid">
-        {MODEL_CATALOG.map((model) => (
-          <button
-            type="button"
-            key={model.value}
-            className={`model-card model-card--${model.accent}${activeModel === model.value ? " model-card--selected" : ""}`}
-            onClick={() => onSelectModel(model.value)}
-          >
-            <div className="model-card-top">
-              <span className="model-glyph">{model.short}</span>
-              {activeModel === model.value && <span className="model-live">ĐANG DÙNG</span>}
-            </div>
-            <strong>{model.name}</strong>
-            <span className="model-path">{model.path}</span>
-            <small>{model.note}</small>
-            <span className="model-card-arrow">↗</span>
-          </button>
-        ))}
-      </div>
-      <div className="model-footer-line"><span /> PhoBERT · Vietnamese HSD pipeline <span /></div>
-    </div>
-  );
-}
-
-function EvaluationWorkspace({ activeModel, metrics = [] }) {
-  const largestError = COMBINED_ERRORS[0];
 
   if (!metrics.length) {
     return (
@@ -372,16 +210,21 @@ function EvaluationWorkspace({ activeModel, metrics = [] }) {
     );
   }
 
-  const bestMacro = metrics.reduce(
-    (best, item) => ((item.macroF1 ?? 0) > (best.macroF1 ?? 0) ? item : best),
-    metrics[0],
-  );
-  const bestHate = metrics.reduce(
-    (best, item) => ((item.hateF1 ?? 0) > (best.hateF1 ?? 0) ? item : best),
-    metrics[0],
-  );
   const selected =
-    metrics.find((item) => item.experiment === activeModel) ?? metrics[0];
+    metrics.find((item) => item.experiment === (pickedModel ?? activeModel)) ?? metrics[0];
+  const shownColumns = METRIC_COLUMNS.filter((col) => visibleColumns.includes(col.id));
+  // Hạng của model đang xem theo từng chỉ số, để thay cho nhãn "tốt nhất" đã bỏ.
+  function rankOf(field) {
+    const order = [...metrics].sort((a, b) => (b[field] ?? 0) - (a[field] ?? 0));
+    return order.findIndex((item) => item.experiment === selected.experiment) + 1;
+  }
+
+  // Confusion counts riêng của model đang chọn. Số loại lỗi khác nhau giữa các
+  // model -- model không mắc loại nào thì CSV không có dòng đó.
+  const selectedErrors = Array.isArray(errors[selected.experiment])
+    ? errors[selected.experiment]
+    : [];
+  const largestError = selectedErrors[0] ?? null;
 
   return (
     <div className="workspace-view workspace-view--evaluation">
@@ -394,60 +237,6 @@ function EvaluationWorkspace({ activeModel, metrics = [] }) {
         <div className="evaluation-stamp">LIVE<br /><b>RESULTS</b></div>
       </div>
 
-      <div className={`metric-spotlight metric-spotlight--${cssKey(selected.experiment)}`}>
-        <div>
-          <span>MODEL ĐANG CHỌN</span>
-          <strong>{selected.experiment.toUpperCase()}</strong>
-          <small>kết quả theo model đang dùng</small>
-        </div>
-        <div>
-          <span>ACCURACY</span>
-          <strong>{formatPercent(selected.accuracy)}</strong>
-          <small>test set</small>
-        </div>
-        <div>
-          <span>MACRO-F1 TỐT NHẤT</span>
-          <strong>{formatPercent(bestMacro.macroF1)}</strong>
-          <small>{bestMacro.experiment.toUpperCase()}</small>
-        </div>
-        <div>
-          <span>HATE-F1 TỐT NHẤT</span>
-          <strong>{formatPercent(bestHate.hateF1)}</strong>
-          <small>{bestHate.experiment.toUpperCase()}</small>
-        </div>
-      </div>
-
-      <div className="evaluation-table-wrap">
-        <div className="table-caption">
-          <span>EXPERIMENT SUMMARY</span>
-          <span>{metrics.length} RUNS · SORTED BY ACCURACY</span>
-        </div>
-        <div className="evaluation-table" role="table">
-          <div className="evaluation-row evaluation-row--head" role="row">
-            <span>EXPERIMENT</span>
-            <span>ACCURACY</span>
-            <span>MACRO-F1</span>
-            <span>WEIGHTED-F1</span>
-            <span>HATE-F1</span>
-          </div>
-          {[...metrics]
-            .sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0))
-            .map((item) => (
-              <div
-                className={`evaluation-row evaluation-row--${cssKey(item.experiment)}${item.experiment === selected.experiment ? " evaluation-row--active" : ""}`}
-                key={item.experiment}
-                role="row"
-              >
-                <span>{item.experiment}</span>
-                <span>{formatPercent(item.accuracy)}</span>
-                <span>{formatPercent(item.macroF1)}</span>
-                <span>{formatPercent(item.weightedF1)}</span>
-                <span>{formatPercent(item.hateF1)}</span>
-              </div>
-            ))}
-        </div>
-      </div>
-
       <section className="error-analysis-panel">
         <div className="error-analysis-heading">
           <div>
@@ -456,33 +245,128 @@ function EvaluationWorkspace({ activeModel, metrics = [] }) {
           </div>
           <span className="error-analysis-source">confusion_summary.csv</span>
         </div>
-        <div className="error-analysis-layout">
-          <div className="error-callout">
-            <span className="error-summary-icon">!</span>
-            <div>
-              <strong>Lỗi nổi bật nhất</strong>
-              <p>
-                <b>{largestError.from}</b> bị dự đoán thành <b>{largestError.to}</b>{" "}
-                trong <em>{largestError.count.toLocaleString("vi-VN")}</em> trường hợp.
-              </p>
+        {largestError ? (
+          <div className="error-analysis-layout">
+            <div className="error-callout">
+              <span className="error-summary-icon">!</span>
+              <div>
+                <strong>Lỗi nổi bật nhất</strong>
+                <p>
+                  <b>{largestError.from}</b> bị dự đoán thành <b>{largestError.to}</b>{" "}
+                  trong <em>{largestError.count.toLocaleString("vi-VN")}</em> trường hợp.
+                </p>
+              </div>
+            </div>
+            <div className="error-bars">
+              {selectedErrors.map((error) => (
+                <div className="error-bar-row" key={`${error.from}-${error.to}`}>
+                  <span className="error-bar-label">{error.from} <i>→</i> {error.to}</span>
+                  <span className="error-bar-track">
+                    <span
+                      className={`error-bar-fill error-bar-fill--${ERROR_TONES[error.to] ?? "offensive"}`}
+                      style={{ width: `${(error.count / largestError.count) * 100}%` }}
+                    />
+                  </span>
+                  <strong>{error.count.toLocaleString("vi-VN")}</strong>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="error-bars">
-            {COMBINED_ERRORS.map((error) => (
-              <div className="error-bar-row" key={`${error.from}-${error.to}`}>
-                <span className="error-bar-label">{error.from} <i>→</i> {error.to}</span>
-                <span className="error-bar-track">
-                  <span
-                    className={`error-bar-fill error-bar-fill--${error.tone}`}
-                    style={{ width: `${(error.count / largestError.count) * 100}%` }}
-                  />
-                </span>
-                <strong>{error.count.toLocaleString("vi-VN")}</strong>
-              </div>
-            ))}
+        ) : (
+          <div className="tool-empty-note">
+            Chưa có dữ liệu lỗi cho <code>{selected.experiment}</code> trong{" "}
+            <code>results/error_analysis/confusion_summary.csv</code>.
+          </div>
+        )}
+      </section>
+
+      <div className={`metric-spotlight metric-spotlight--${cssKey(selected.experiment)}`}>
+        <div>
+          <span>MODEL ĐANG CHỌN</span>
+          <strong>{selected.experiment.toUpperCase()}</strong>
+          <small>chọn một dòng trong bảng để đổi</small>
+        </div>
+        <div>
+          <span>ACCURACY</span>
+          <strong>{formatPercent(selected.accuracy)}</strong>
+          <small>hạng {rankOf("accuracy")}/{metrics.length}</small>
+        </div>
+        <div>
+          <span>MACRO-F1</span>
+          <strong>{formatPercent(selected.macroF1)}</strong>
+          <small>hạng {rankOf("macroF1")}/{metrics.length}</small>
+        </div>
+        <div>
+          <span>WEIGHTED-F1</span>
+          <strong>{formatPercent(selected.weightedF1)}</strong>
+          <small>hạng {rankOf("weightedF1")}/{metrics.length}</small>
+        </div>
+        <div>
+          <span>HATE-F1</span>
+          <strong>{formatPercent(selected.hateF1)}</strong>
+          <small>hạng {rankOf("hateF1")}/{metrics.length}</small>
+        </div>
+      </div>
+
+      <div className="evaluation-table-wrap">
+        <div className="table-caption">
+          <span>EXPERIMENT SUMMARY</span>
+          <div className="column-filter" role="group" aria-label="Chọn cột hiển thị">
+            <em>CỘT:</em>
+            {METRIC_COLUMNS.map((col) => {
+              const shown = visibleColumns.includes(col.id);
+              const locked = shown && visibleColumns.length === 1;
+              return (
+                <button
+                  type="button"
+                  key={col.id}
+                  className="column-chip"
+                  aria-pressed={shown}
+                  disabled={locked}
+                  title={locked ? "Phải giữ ít nhất một cột" : shown ? "Ẩn cột" : "Hiện cột"}
+                  onClick={() => toggleColumn(col.id)}
+                >
+                  {col.label}
+                </button>
+              );
+            })}
           </div>
         </div>
-      </section>
+        <div className="evaluation-table-scroll" style={{ "--metric-count": shownColumns.length }}>
+        <div className="evaluation-table" role="table">
+          <div className="evaluation-row evaluation-row--head" role="row">
+            <span>EXPERIMENT</span>
+            {shownColumns.map((col) => (
+              <span key={col.id}>{col.label}</span>
+            ))}
+          </div>
+          {[...metrics]
+            .sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0))
+            .map((item) => (
+              <div
+                className={`evaluation-row evaluation-row--${cssKey(item.experiment)}${item.experiment === selected.experiment ? " evaluation-row--active" : ""}`}
+                key={item.experiment}
+                role="row"
+                tabIndex={0}
+                aria-selected={item.experiment === selected.experiment}
+                title={`Xem kết quả của ${item.experiment}`}
+                onClick={() => setPickedModel(item.experiment)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setPickedModel(item.experiment);
+                  }
+                }}
+              >
+                <span>{item.experiment}</span>
+                {shownColumns.map((col) => (
+                  <span key={col.id}>{formatPercent(item[col.id])}</span>
+                ))}
+              </div>
+            ))}
+        </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -677,12 +561,15 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [metadata, setMetadata] = useState(null);
   const [evaluationMetrics, setEvaluationMetrics] = useState([]);
+  const [evaluationErrors, setEvaluationErrors] = useState({});
   const [status, setStatus] = useState("checking");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [activeTool, setActiveTool] = useState("classifier");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [analysisHistory, setAnalysisHistory] = useState(readStoredHistory);
+  const [theme, setTheme] = useState(readStoredTheme);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -701,8 +588,13 @@ export default function App() {
   }, [metadata, model, availableModelOptions.length]);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", "dark");
-  }, []);
+    document.documentElement.setAttribute("data-theme", theme);
+    try { localStorage.setItem(THEME_STORAGE_KEY, theme); } catch {}
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((t) => (t === "dark" ? "light" : "dark"));
+  }
 
   useEffect(() => {
     localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(analysisHistory));
@@ -724,6 +616,7 @@ export default function App() {
         setMetadata(payload);
         setStatus("online");
 
+        // Metrics và error analysis đều optional -- không block trạng thái online.
         try {
           const metricsRes = await fetch(`${API_BASE_URL}/evaluation/metrics`);
           if (metricsRes.ok) {
@@ -731,7 +624,17 @@ export default function App() {
             setEvaluationMetrics(Array.isArray(metrics) ? metrics : []);
           }
         } catch {
-          // Metrics optional -- không block trạng thái online.
+          // Bỏ qua -- EvaluationWorkspace sẽ hiện empty state.
+        }
+
+        try {
+          const errorsRes = await fetch(`${API_BASE_URL}/evaluation/errors`);
+          if (errorsRes.ok) {
+            const errors = await errorsRes.json();
+            setEvaluationErrors(errors && typeof errors === "object" ? errors : {});
+          }
+        } catch {
+          // Backend cũ chưa có /evaluation/errors -- khối Error Analysis sẽ báo thiếu dữ liệu.
         }
       } catch {
         setStatus("offline");
@@ -876,13 +779,6 @@ export default function App() {
     e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px";
   }
 
-  function handleNewChat() {
-    setMessages([]);
-    setInputValue("");
-    setIsSubmitting(false);
-    textareaRef.current?.focus();
-  }
-
   return (
     <div className={`app-shell${isEmptyClassifier ? " app-shell--empty" : ""}${sidebarOpen ? "" : " app-shell--sidebar-collapsed"}`}>
       <aside className="app-sidebar" aria-label="Thanh điều hướng chính">
@@ -899,11 +795,6 @@ export default function App() {
             <SidebarToggleIcon />
           </button>
         </div>
-
-        <button type="button" className="new-chat-button" onClick={handleNewChat}>
-          <Plus className="new-chat-icon" aria-hidden="true" />
-          <span className="new-chat-label">Cuộc trò chuyện mới</span>
-        </button>
 
         <div className="sidebar-section">
           <span className="sidebar-label">Công cụ</span>
@@ -933,20 +824,66 @@ export default function App() {
         </div>
       </aside>
 
+      {/* Mobile drawer overlay */}
+      <div className={`mobile-drawer-overlay${mobileDrawerOpen ? " open" : ""}`} onClick={() => setMobileDrawerOpen(false)} />
+      <aside className={`mobile-drawer${mobileDrawerOpen ? " open" : ""}`} aria-label="Menu di động">
+        <div className="mobile-drawer-header">
+          <HsdLogo />
+          <SidebarBrand />
+          <button type="button" className="mobile-drawer-close" onClick={() => setMobileDrawerOpen(false)} aria-label="Đóng menu">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="sidebar-section">
+          <span className="sidebar-label">Công cụ</span>
+          {TOOL_OPTIONS.map((tool) => {
+            const ToolIcon = tool.icon;
+            return (
+              <button
+                type="button"
+                key={tool.value}
+                className={`sidebar-tool${activeTool === tool.value ? " active" : ""}`}
+                onClick={() => { setActiveTool(tool.value); setMobileDrawerOpen(false); }}
+                aria-current={activeTool === tool.value ? "page" : undefined}
+              >
+                <span className="sidebar-tool-icon" aria-hidden="true"><ToolIcon /></span>
+                <span className="sidebar-tool-label">{tool.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="sidebar-spacer" />
+        <div className="sidebar-note">
+          <span className="sidebar-note-dot" />
+          <span className="sidebar-note-label">Chạy cục bộ · riêng tư</span>
+        </div>
+      </aside>
+
       <div className="chat-layout">
         <header className="chat-header">
+          <div className="mobile-brand">
+            <HsdLogo />
+            <SidebarBrand />
+          </div>
           <div className="header-actions">
             <span className={`status-badge status--${status}`}>
               <span className="status-dot" aria-hidden="true" />
               {status === "online" ? "Sẵn sàng" : "Ngoại tuyến"}
             </span>
+            <button
+              type="button"
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-label={theme === "dark" ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối"}
+            >
+              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
           </div>
         </header>
 
         <main className="chat-messages">
           {activeTool !== "classifier" || messages.length === 0 ? (
-            activeTool === "models" ? <ModelWorkspace activeModel={model} onSelectModel={setModel} />
-            : activeTool === "evaluation" ? <EvaluationWorkspace activeModel={model} metrics={evaluationMetrics} />
+            activeTool === "evaluation" ? <EvaluationWorkspace activeModel={model} metrics={evaluationMetrics} errors={evaluationErrors} />
             : <div className={`empty-chat-greeting${activeTool !== "classifier" ? " tool-view" : ""}`}>
               <span className="tool-view-kicker">HSD / {activeTool.toUpperCase()}</span>
               <h1>{selectedTool.title}</h1>
@@ -1044,7 +981,7 @@ export default function App() {
             <textarea
               id="chat-input"
               name="chat-input"
-              aria-label="Nội dung cần kiểm tra"
+              aria-label="Nhập văn bản cần kiểm tra"
               ref={textareaRef}
               className="chat-textarea"
               value={inputValue}
@@ -1054,11 +991,54 @@ export default function App() {
               rows={1}
             />
             <div className="input-bottom-row">
-              <ModelSelector
-                availableOptions={availableModelOptions}
-                currentModel={model}
-                onSelect={setModel}
-              />
+              {availableModelOptions.length === 1 ? (
+                <div className="model-current" title={availableModelOptions[0].label}>
+                  <span className="model-current-dot" aria-hidden="true" />
+                  <span>{availableModelOptions[0].shortLabel}</span>
+                  <span className="model-current-state">đang dùng</span>
+                </div>
+              ) : (
+                <>
+                  {/* Desktop: tab bar */}
+                  <div
+                    className="model-selector model-selector--desktop"
+                    role="tablist"
+                    aria-label="Chọn mô hình phân loại"
+                    style={{ "--model-count": availableModelOptions.length }}
+                  >
+                    <span
+                      className="model-selector-indicator"
+                      style={{ "--model-index": availableModelOptions.findIndex((option) => option.value === model) }}
+                      aria-hidden="true"
+                    />
+                    {availableModelOptions.map((opt) => (
+                      <button
+                        type="button"
+                        key={opt.value}
+                        role="tab"
+                        aria-selected={model === opt.value}
+                        aria-label={opt.label}
+                        title={opt.label}
+                        className={`model-option${model === opt.value ? " model-option--active" : ""}`}
+                        onClick={() => setModel(opt.value)}
+                      >
+                        {opt.shortLabel}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Mobile: dropdown */}
+                  <select
+                    className="model-dropdown"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    aria-label="Chọn mô hình phân loại"
+                  >
+                    {availableModelOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </>
+              )}
 
               <button
                 className="send-button"
@@ -1072,12 +1052,27 @@ export default function App() {
             </div>
           </div>
           <p className="footer-disclaimer">Kết quả chỉ mang tính tham khảo.</p>
-        </footer> : (
-          <footer className="chat-footer tool-footer">
-            <span>Chọn "Phân loại độc hại" để bắt đầu một phiên kiểm tra mới.</span>
-          </footer>
-        )}
+        </footer> : null}
       </div>
+
+      {/* Mobile bottom navigation */}
+      <nav className="mobile-bottom-nav" aria-label="Điều hướng nhanh">
+        {TOOL_OPTIONS.map((tool) => {
+          const ToolIcon = tool.icon;
+          return (
+            <button
+              type="button"
+              key={tool.value}
+              className={`bottom-nav-item${activeTool === tool.value ? " active" : ""}`}
+              onClick={() => setActiveTool(tool.value)}
+              aria-current={activeTool === tool.value ? "page" : undefined}
+            >
+              <ToolIcon size={20} />
+              <span>{tool.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }
