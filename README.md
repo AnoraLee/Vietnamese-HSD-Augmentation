@@ -1,7 +1,7 @@
 # HSD Studio — Vietnamese Hate Speech Detection
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](#quick-start)
-[![Models](https://img.shields.io/badge/models-PhoBERT%20%7C%20ViSoBERT-orange)](#the-seven-experiments)
+[![Models](https://img.shields.io/badge/models-PhoBERT%20%7C%20ViSoBERT-orange)](#experiments--results)
 [![Backend](https://img.shields.io/badge/backend-FastAPI-009688)](#api-reference)
 [![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-61DAFB)](#frontend)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
@@ -20,46 +20,17 @@ The repository contains the end-to-end research pipeline across PhoBERT and ViSo
 
 ## Contents
 
-- [Results](#results)
 - [Quick start](#quick-start)
 - [Docker](#docker)
 - [Deployment](#deployment)
 - [Project structure](#project-structure)
-- [The seven experiments](#the-seven-experiments)
+- [Experiments & Results](#experiments--results)
 - [Research pipeline](#research-pipeline)
 - [API reference](#api-reference)
 - [Frontend](#frontend)
 - [Data](#data)
-- [Installation](#installation)
-- [Troubleshooting](#troubleshooting)
-- [Known limitations](#known-limitations)
-- [Acknowledgments](#acknowledgments)
-- [Authors](#authors)
-- [License](#license)
-
----
-
-## Results
-
-All experiments are evaluated on the exact same frozen test set (**6,576 samples**; the development set has **2,650 samples**). Only the training set and model backbone change between experiments.
-
-| Experiment | Backbone | Accuracy | Macro F1 | Weighted F1 | HATE F1 |
-| ---------- | -------- | -------- | -------- | ----------- | ------- |
-| `phobert_baseline` | PhoBERT | 84.4% | 60.2% | 84.7% | 53.8% |
-| `phobert_bt` | PhoBERT | 83.0% | 44.5% | 79.8% | 42.7% |
-| `phobert_eda` | PhoBERT | 78.4% | 58.3% | 81.3% | 56.5% |
-| `phobert_llm` | PhoBERT | 83.5% | 60.9% | 84.5% | 56.1% |
-| `phobert_combined` | PhoBERT | 78.0% | 57.3% | 80.7% | 58.0% |
-| `visobert_baseline` | ViSoBERT | **84.5%** | **61.5%** | **85.1%** | 55.5% |
-| `visobert_combined` | ViSoBERT | 77.9% | 57.0% | 80.5% | **58.7%** |
-
-### Key Findings
-1. **The Class Imbalance Trade-off:** The corpus is heavily imbalanced (`CLEAN` accounts for the vast majority). Standard Accuracy and Weighted F1 predominantly reflect performance on clean sentences. For content moderation, **HATE F1** is the metric that matters most.
-2. **Value of Data Augmentation:** Combining multiple augmentation sources (`phobert_combined` and `visobert_combined`) yields the highest HATE F1 scores (**58.0%** and **58.7%**, up by +4.2% and +4.9% over PhoBERT baseline), successfully trading off a small percentage of accuracy on clean samples to capture significantly more genuine toxicity.
-3. **Architecture Comparison:** ViSoBERT demonstrates superior representations on informal Vietnamese social media abbreviations and slang, with `visobert_baseline` achieving the best overall Macro F1 (61.5%) and Weighted F1 (85.1%).
-4. **Back-translation Semantic Drift:** Round-trip translation (vi $\rightarrow$ en $\rightarrow$ vi) frequently softened aggressive terms and colloquial slurs, causing `phobert_bt` to struggle on minority classes.
-
-Consolidated metrics are stored in `results/experiments_summary.csv` and per-experiment metrics are in `results/metrics/metrics_<experiment>.json`. Run `python scripts/summarize_ablation.py` to regenerate the comparison table and chart under `results/figures/`.
+- [Testing](#testing)
+- [Authors & License](#authors--license)
 
 ---
 
@@ -67,9 +38,9 @@ Consolidated metrics are stored in `results/experiments_summary.csv` and per-exp
 
 **Requirements:** Python 3.10+ and Node.js (v18+).
 
-### 1. Backend Service
+### 1. Backend
 
-The backend loads the model specified by `MODEL_EXPERIMENT` (default: `phobert_combined`). To preload multiple models for instant switching in the web UI, set `LOADED_EXPERIMENTS` (comma-separated list).
+Set up the Python virtual environment, install requirements, and run the FastAPI server:
 
 **Windows (PowerShell):**
 
@@ -82,7 +53,7 @@ python -m pip install -r requirements.txt
 # Set default model (or specify LOADED_EXPERIMENTS="phobert_baseline,phobert_combined,visobert_baseline")
 $env:MODEL_EXPERIMENT = "phobert_combined"
 
-# Start FastAPI server
+# Start server
 python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
@@ -98,9 +69,9 @@ export MODEL_EXPERIMENT=phobert_combined
 python -m uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### 2. Frontend Studio
+### 2. Frontend
 
-In a separate terminal:
+In a separate terminal, install dependencies and launch the Vite development server:
 
 ```bash
 cd frontend
@@ -108,7 +79,7 @@ npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. The status indicator will switch to **online** once connected to `http://127.0.0.1:8000/health`.
+Open `http://127.0.0.1:5173`. The status pill will turn green once connected to `http://127.0.0.1:8000/health`.
 
 ---
 
@@ -122,16 +93,16 @@ docker compose up --build
 
 - **Service:** `backend` (container: `hsd-backend`)
 - **Port:** `8000:8000`
-- **Volume:** `hf_cache` mounted at `/app/.cache/huggingface` to persist downloaded Hugging Face weights across container restarts.
-- **Healthcheck:** Queries `http://localhost:8000/health` automatically.
+- **Volume:** `hf_cache` mounted at `/app/.cache/huggingface` to persist downloaded model weights across container restarts.
+- **Healthcheck:** Evaluates `http://localhost:8000/health` automatically every 30s.
 
 ---
 
 ## Deployment
 
-The system is deployed as two decoupled components:
+The application is deployed across two decoupled hosting services:
 
-- **Backend (Hugging Face Spaces):** Containerized FastAPI app running at `https://huggingface.co/spaces/BonTori/vietnamese_tdtu_hsd_detectToxic` (`CORS_ORIGINS` configured to allow the Vercel domain).
+- **Backend (Hugging Face Spaces):** Containerized FastAPI app running at `https://huggingface.co/spaces/BonTori/vietnamese_tdtu_hsd_detectToxic` (`CORS_ORIGINS` configured to permit the Vercel domain).
 - **Frontend (Vercel):** React SPA hosted at `https://vietnamese-hsd-augmentation-xx46.vercel.app/` with `VITE_API_BASE_URL` pointing to the Hugging Face Space URL.
 
 ---
@@ -140,67 +111,137 @@ The system is deployed as two decoupled components:
 
 ```
 Vietnamese-HSD-Augmentation/
-├── api/
-│   ├── main.py                  # FastAPI application entrypoint (api.main:app)
-│   ├── schemas.py               # Pydantic request & response schemas
-│   └── evaluation_routes.py     # Evaluation & metrics endpoints (/evaluation/*)
-├── configs/
-│   └── config.yaml              # Central experiment, model, and path configuration
-├── data/                        # Not committed
-│   ├── raw/                     # Raw vihsd_*.csv, voz_*.csv, tdtu_*.csv
-│   ├── processed/               # Frozen datasets: tdtu_train.csv, tdtu_dev.csv, tdtu_test.csv
-│   └── augmented/               # aug_bt.csv, aug_eda.csv, aug_llm.csv, aug_combined.csv
-├── frontend/                    # React + Vite application
-│   ├── public/                  # Static assets (logo-mark.svg)
-│   └── src/                     # App.jsx, styles, components
-├── models/                      # Local model checkpoints (not committed)
-├── notebooks/
-│   ├── 1_data_exploration/      # Data collection from HF & YouTube
-│   ├── 2_preprocessing/         # Text normalization, cleaning, word segmentation
-│   ├── 3_augmentation/          # BT, EDA, LLM, and Combined augmentation pipelines
-│   ├── 4_training/              # PhoBERT & ViSoBERT fine-tuning notebooks
-│   └── 5_evaluation/            # Error analysis & metrics visualization
-├── results/
-│   ├── metrics/                 # metrics_<experiment>.json
-│   ├── figures/                 # Confusion matrices, F1 comparison bar charts
-│   ├── error_analysis/          # Misclassified sample CSVs & confusion summaries
-│   └── experiments_summary.csv  # Consolidated ablation summary table
-├── scripts/                     # Reusable CLI scripts
-│   ├── check_dataset.py         # Integrity and distribution validation
-│   ├── evaluate.py              # Model evaluation runner
-│   ├── run_ablation.py          # Automated ablation runner
-│   ├── run_augmentation.py      # Augmentation pipeline runner
-│   ├── summarize_ablation.py    # Generates summary CSV & comparison plots
-│   └── train.py                 # Training script
-├── src/
-│   ├── models/classifier.py     # Model architectures & wrappers
-│   ├── services/inference.py    # PhoBERT/ViSoBERT inference service + SHAP XAI
-│   └── utils/                   # Config, constants, preprocessing, evaluation helpers
-├── tests/                       # Pytest test suite (API, schemas, preprocessing)
-├── Dockerfile                   # Multi-stage production build
-├── docker-compose.yml           # Compose specification for backend service
-├── requirements.txt             # Project dependencies
-└── LICENSE                      # Apache-2.0 License
+├── api/                         # FastAPI backend & inference endpoints
+│   ├── main.py
+│   ├── schemas.py
+│   └── evaluation_routes.py
+├── configs/                     # Experiment & model configuration
+│   └── config.yaml
+├── data/                        # Datasets (not committed)
+│   ├── processed/               # tdtu_train.csv, tdtu_dev.csv, tdtu_test.csv
+│   ├── augmented/               # aug_combined.csv, aug_bt.csv, ...
+│   └── raw/                     # Raw vihsd, voz, youtube dumps
+├── frontend/                    # React + Vite web studio
+│   ├── public/
+│   └── src/
+├── models/                      # Fine-tuned model checkpoints
+├── notebooks/                   # Jupyter research & exploration notebooks
+│   ├── 1_data_exploration/
+│   ├── 2_preprocessing/
+│   ├── 3_augmentation/
+│   ├── 4_training/
+│   └── 5_evaluation/
+├── results/                     # Experiment metrics, figures, and error analysis
+│   ├── metrics/                 # metrics_phobert_combined.json, ...
+│   ├── figures/                 # Confusion matrices & comparison plots
+│   ├── error_analysis/          # Misclassified samples & confusion summaries
+│   └── experiments_summary.csv
+├── scripts/                     # Reusable CLI utility scripts
+│   ├── train.py
+│   ├── evaluate.py
+│   ├── run_ablation.py
+│   └── ...
+├── src/                         # Shared core modules
+│   ├── models/                  # Classifier architectures
+│   ├── services/                # Inference & SHAP service
+│   └── utils/                   # Preprocessing, config, metrics
+├── tests/                       # Automated test suite
+│   ├── test_api.py
+│   ├── test_schemas.py
+│   └── ...
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+└── LICENSE
 ```
 
 ---
 
-## The seven experiments
+## Experiments & Results
 
-| Experiment Key | Architecture | Description / Training Data |
-| -------------- | ------------ | --------------------------- |
-| `phobert_baseline` | PhoBERT-base | Fine-tuned on the original unaugmented training set |
-| `phobert_bt` | PhoBERT-base | Baseline + Back-translation augmentation (vi $\rightarrow$ en $\rightarrow$ vi) |
-| `phobert_eda` | PhoBERT-base | Baseline + Easy Data Augmentation (swap, insertion, deletion) |
-| `phobert_llm` | PhoBERT-base | Baseline + Synthetic samples generated via LLMs (Gemma, Qwen) |
-| `phobert_combined` | PhoBERT-base | Merged BT + EDA + LLM augmentations (deduplicated & filtered) |
-| `visobert_baseline` | ViSoBERT | Fine-tuned on unaugmented data using ViSoBERT |
-| `visobert_combined` | ViSoBERT | ViSoBERT fine-tuned on the combined augmented training set |
+All seven experiments are evaluated on the exact same frozen test set (**6,576 samples**; the development set has **2,650 samples**).
 
-These keys are used consistently across the entire repository:
-- Checkpoints: Hosted on Hugging Face Hub under `BonTori/` and `AnoraLee/` (mapped in `configs/config.yaml` and `src/utils/constants.py`).
-- Metrics: `results/metrics/metrics_<experiment>.json`.
-- API: Accepted in the `"model"` field of all prediction and explanation endpoints.
+<table>
+  <thead>
+    <tr>
+      <th>Backbone</th>
+      <th>Experiment Key</th>
+      <th>Data Augmentation Strategy</th>
+      <th>Accuracy</th>
+      <th>Macro F1</th>
+      <th>Weighted F1</th>
+      <th>HATE F1</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="5" align="center"><strong>PhoBERT-base</strong></td>
+      <td><code>phobert_baseline</code></td>
+      <td>Original unaugmented training set</td>
+      <td>84.4%</td>
+      <td>60.2%</td>
+      <td>84.7%</td>
+      <td>53.8%</td>
+    </tr>
+    <tr>
+      <td><code>phobert_bt</code></td>
+      <td>+ Back-translation (vi → en → vi)</td>
+      <td>83.0%</td>
+      <td>44.5%</td>
+      <td>79.8%</td>
+      <td>42.7%</td>
+    </tr>
+    <tr>
+      <td><code>phobert_eda</code></td>
+      <td>+ Easy Data Augmentation (swap, insert, delete)</td>
+      <td>78.4%</td>
+      <td>58.3%</td>
+      <td>81.3%</td>
+      <td>56.5%</td>
+    </tr>
+    <tr>
+      <td><code>phobert_llm</code></td>
+      <td>+ Synthetic samples via LLMs (Gemma, Qwen)</td>
+      <td>83.5%</td>
+      <td>60.9%</td>
+      <td>84.5%</td>
+      <td>56.1%</td>
+    </tr>
+    <tr>
+      <td><code>phobert_combined</code></td>
+      <td>Merged BT + EDA + LLM augmentations (deduplicated)</td>
+      <td>78.0%</td>
+      <td>57.3%</td>
+      <td>80.7%</td>
+      <td>58.0%</td>
+    </tr>
+    <tr>
+      <td rowspan="2" align="center"><strong>ViSoBERT</strong></td>
+      <td><code>visobert_baseline</code></td>
+      <td>Original unaugmented training set</td>
+      <td><strong>84.5%</strong></td>
+      <td><strong>61.5%</strong></td>
+      <td><strong>85.1%</strong></td>
+      <td>55.5%</td>
+    </tr>
+    <tr>
+      <td><code>visobert_combined</code></td>
+      <td>Combined augmented training set</td>
+      <td>77.9%</td>
+      <td>57.0%</td>
+      <td>80.5%</td>
+      <td><strong>58.7%</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+### Key Findings
+1. **The Class Imbalance Trade-off:** The corpus is heavily imbalanced (`CLEAN` accounts for the vast majority). Standard Accuracy and Weighted F1 predominantly reflect performance on clean sentences. For content moderation, **HATE F1** is the critical metric.
+2. **Value of Data Augmentation:** Combining multiple augmentation sources (`phobert_combined` and `visobert_combined`) yields the highest HATE F1 scores (**58.0%** and **58.7%**, up by +4.2% and +4.9% over PhoBERT baseline), successfully trading off a small percentage of accuracy on clean samples to capture significantly more genuine toxicity.
+3. **Architecture Comparison:** ViSoBERT demonstrates superior representations on informal Vietnamese social media abbreviations and slang, with `visobert_baseline` achieving the best overall Macro F1 (61.5%) and Weighted F1 (85.1%).
+4. **Back-translation Semantic Drift:** Round-trip translation (vi → en → vi) frequently softened aggressive terms and colloquial slurs, causing `phobert_bt` to struggle on minority classes.
+
+Consolidated metrics are stored in `results/experiments_summary.csv` and per-experiment metrics are in `results/metrics/metrics_<experiment>.json`. Run `python scripts/summarize_ablation.py` to regenerate the comparison table and chart under `results/figures/`.
 
 ---
 
@@ -291,24 +332,35 @@ Batched inference accepting 1 to 100 sentences in a single request:
 
 ### `GET /health`
 
-Health check endpoint returning active server state:
+Health check endpoint returning active server state, default model, compute device, and all loaded checkpoints:
 
 ```json
 {
   "status": "ok",
   "model": "phobert_combined",
   "device": "cpu",
-  "available_models": ["phobert_combined", "phobert_baseline", "visobert_baseline"]
+  "available_models": ["phobert_baseline", "phobert_bt", "phobert_eda", "phobert_llm", "phobert_combined", "visobert_baseline", "visobert_combined"]
 }
 ```
 
 ### `GET /metadata`
 
-Exposes model metadata, preprocessing configuration, class labels, and loaded checkpoints.
+Exposes model parameters, preprocessing pipeline description, label set, and available checkpoints:
+
+```json
+{
+  "model": "phobert_combined",
+  "device": "cpu",
+  "labels": ["CLEAN", "OFFENSIVE", "HATE"],
+  "max_length": 128,
+  "preprocessing": "Underthesea word segmentation + teencode normalization",
+  "available_models": ["phobert_baseline", "phobert_bt", "phobert_eda", "phobert_llm", "phobert_combined", "visobert_baseline", "visobert_combined"]
+}
+```
 
 ### `GET /evaluation/metrics`
 
-Returns benchmark metrics for all evaluated experiments (used by the frontend evaluation dashboard).
+Returns benchmark metrics for all evaluated experiments (consumed by the web frontend's evaluation dashboard):
 
 ---
 
@@ -330,28 +382,16 @@ To point to a remote backend, copy `frontend/.env.example` to `frontend/.env.loc
 
 ## Data
 
-The dataset combines the ViHSD benchmark with domain-specific social media text gathered from VOZ forums and YouTube comments.
+The benchmark dataset consolidates the ViHSD corpus with domain-specific comments collected from VOZ forums and YouTube.
 
-- Raw data and intermediate augmented files are stored locally under `data/` and are not committed to git.
-- Processed splits are configured in `configs/config.yaml`:
-  - `data/processed/tdtu_train.csv` (86,719 samples)
-  - `data/processed/tdtu_dev.csv` (2,650 samples)
-  - `data/processed/tdtu_test.csv` (6,576 samples)
+- **Frozen Splits:** `tdtu_train.csv` (86,719 samples), `tdtu_dev.csv` (2,650 samples), `tdtu_test.csv` (6,576 samples) located in `data/processed/`.
+- **Augmentation Data:** Augmented subsets generated via Back-translation, EDA, and LLM synthesis are stored under `data/augmented/`.
 
 ---
 
-## Installation
+## Testing
 
-```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-### Running Tests
-
-Execute the automated test suite using `pytest`:
+Run the automated test suite with pytest:
 
 ```bash
 pytest tests/ -v
@@ -359,39 +399,14 @@ pytest tests/ -v
 
 ---
 
-## Troubleshooting
-
-- **`output_attentions=True` issues:** `src/services/inference.py` loads models with eager attention when needed to maintain compatibility with varying `transformers` releases.
-- **`POST /explain` latency:** SHAP evaluation runs multiple forward passes over masked inputs. On CPU, keep `max_evals` between 20 and 80 for reasonable response times (~1–3 seconds).
-- **CORS Errors:** Ensure your frontend URL is included in the backend's `CORS_ORIGINS` environment variable (comma-separated list).
-
----
-
-## Known limitations
-
-- **Social Media Domain Shift:** Fast-evolving youth slang, sarcasm, and intentionally obfuscated profanity remain challenging for automated classifiers.
-- **SHAP Latency:** Explanations require compute budgets proportional to input sentence length.
-- **Research Prototype:** Designed for academic evaluation and benchmarking of data augmentation strategies; human oversight is recommended for production content moderation.
-
----
-
-## Acknowledgments
-
-This research builds upon the following open-source resources and foundational works:
-- [PhoBERT](https://github.com/VinAIResearch/PhoBERT) (VinAI Research)
-- [ViSoBERT](https://github.com/VinAIResearch/ViSoBERT) (VinAI Research)
-- [Underthesea](https://github.com/undertheseanlp/underthesea) (Vietnamese NLP Toolkit)
-- [SHAP](https://github.com/shap-project/shap) (Shapley Additive Explanations)
-- ViHSD (Vietnamese Hate Speech Detection Dataset)
-
----
-
-## Authors
+## Authors & Acknowledgments
 
 Faculty of Information Technology, **Ton Duc Thang University (TDTU)**.
+
+This project is built upon open-source foundations: [PhoBERT](https://github.com/VinAIResearch/PhoBERT), [ViSoBERT](https://github.com/VinAIResearch/ViSoBERT), [Underthesea](https://github.com/undertheseanlp/underthesea), [SHAP](https://github.com/shap-project/shap), and the ViHSD corpus.
 
 ---
 
 ## License
 
-Code is distributed under the [Apache License 2.0](LICENSE). Datasets and pre-trained checkpoints are subject to their respective upstream licenses.
+Code is distributed under the [Apache License 2.0](LICENSE).
