@@ -1042,6 +1042,9 @@ export default function App() {
         {activeTool === "classifier" ? <footer className="chat-footer">
           <div className="input-container">
             <textarea
+              id="chat-input"
+              name="chat-input"
+              aria-label="Nội dung cần kiểm tra"
               ref={textareaRef}
               className="chat-textarea"
               value={inputValue}
