@@ -10,7 +10,7 @@ A transformer-based classification suite for Vietnamese hate speech (`CLEAN` / `
 
 The repository contains the end-to-end research pipeline across PhoBERT and ViSoBERT backbones, a high-performance FastAPI service supporting on-demand SHAP explainability (XAI), and a responsive React web studio for interactive side-by-side model evaluation and error analysis.
 
-**Live demo:** https://vietnamese-hsd-augmentation-xx46.vercel.app/  
+**Live demo:** https://vietnamese-hsd-augmentation.vercel.app/  
 **Backend (Hugging Face Space):** https://huggingface.co/spaces/BonTori/vietnamese_tdtu_hsd_detectToxic  
 *(Direct API Endpoint: `https://bontori-vietnamese-tdtu-hsd-detecttoxic.hf.space`)*
 
