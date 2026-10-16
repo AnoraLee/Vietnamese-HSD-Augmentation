@@ -12,6 +12,7 @@ The repository contains the end-to-end research pipeline across PhoBERT and ViSo
 
 **Live demo (Vercel):** https://vietnamese-hsd-augmentation.vercel.app/  
 **Backend (Hugging Face Space):** https://huggingface.co/spaces/BonTori/vietnamese_tdtu_hsd_detectToxic  
+**API Docs (Swagger UI):** https://bontori-vietnamese-tdtu-hsd-detecttoxic.hf.space/docs  
 *(Direct API Endpoint: `https://bontori-vietnamese-tdtu-hsd-detecttoxic.hf.space`)*
 
 <p align="center">
@@ -262,6 +263,8 @@ Consolidated metrics are stored in `results/experiments_summary.csv` and per-exp
 ---
 
 ## API reference
+
+> **Interactive API Documentation:** You can test all endpoints directly in your browser using the [FastAPI Swagger UI](https://bontori-vietnamese-tdtu-hsd-detecttoxic.hf.space/docs).
 
 ### `POST /predict`
 
